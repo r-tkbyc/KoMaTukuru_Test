@@ -146,21 +146,29 @@
     padding: 10px 12px;
   }
   
-  /* PDF取り込み（エントリーシート）: 既存デザインに合わせて最小追加 */
+  /* PDF取り込み（エントリーシート）: 既存デザインに合わせる（textarea相当） */
   #pdfDropZone{
-    border: 1px dashed #22303e;
+    border: 1px solid #22303e;
     background: #0b121a;
-    border-radius: 6px;
-    padding: 12px;
-    text-align:center;
-    color: #cbd5e1;
+    border-radius: 6px; /* textarea と統一 */
+    padding: 10px;
+    min-height: 60px; /* textarea と統一 */
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    color: #e6edf3;
+    line-height: 1.45;
+    font-size: 13px;
     user-select: none;
   }
   #pdfDropZone.dragover{
-    outline: 2px solid #2a81fb;
-    outline-offset: 2px;
+    outline: 1px solid #2a81fb;
+    outline-offset: 0;
+    box-shadow: 0 0 0 1px #2a81fb inset;
   }
-  #pdfStatus{
+
+#pdfStatus{
     margin-top: 8px;
     font-size: 12px;
     color: #cbd5e1;
@@ -181,7 +189,7 @@
     margin-top: 8px;
     padding: 10px;
     border-radius: 6px;
-    background:#0b1220;
+    background:#0b121a;
     border: 1px solid #22303e;
     overflow:auto;
     max-height: 220px;
@@ -1042,7 +1050,9 @@
     //   2) URL に ?kmt_debug=1 を付けて開く
     const DEBUG_KEY = 'KMT_PDF_DEBUG';
     const DEBUG_MODE_FROM_URL = (new URLSearchParams(location.search).get('kmt_debug') === '1');
-    let debugMode = DEBUG_MODE_FROM_URL || (localStorage.getItem(DEBUG_KEY) === '1');
+    let debugMode = DEBUG_MODE_FROM_URL;
+    try{ debugMode = debugMode || (localStorage.getItem(DEBUG_KEY) === '1'); }catch(_e){ /* storage blocked */ }
+
 
     // ========= Elements =========
     const elPickBtn = document.getElementById('pdfPickBtn');
@@ -1093,9 +1103,8 @@
     }
 
     function normalizeCRLF(s){
-      return (s ?? '').toString().replace(/
-?/g, '
-');
+      // Normalize line endings without altering content (NO OCR)
+      return (s ?? '').toString().replace(/\r\n/g, '\n').replace(/\r/g, '\n');
     }
 
     function fireInput(el){
