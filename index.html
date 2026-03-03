@@ -1060,9 +1060,8 @@
   })();
   </script>
 
-  <!-- PDF.js (for in-browser text-layer extraction; NO OCR) -->
-  <script src="https://cdn.jsdelivr.net/npm/pdfjs-dist@4.10.38/build/pdf.min.js"></script>
-  <script>
+  <!-- PDF.js loader (NO OCR) - tries local first, then multiple CDNs -->
+<script>
   (function(){
     'use strict';
 
@@ -1150,14 +1149,71 @@
     }
 
     // ========= PDF parsing =========
-    function ensurePdfJs(){
-      if(!window.pdfjsLib){
-        throw new Error('PDF.js の読み込みに失敗しました。');
+    async function ensurePdfJs(){
+      if(window.pdfjsLib){
+        // already loaded
+        if(!pdfjsLib.GlobalWorkerOptions.workerSrc){
+          // default worker (only used if worker is enabled)
+          pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.worker.min.js';
+        }
+        return;
       }
-      // Worker
-      if(!pdfjsLib.GlobalWorkerOptions.workerSrc){
-        pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdn.jsdelivr.net/npm/pdfjs-dist@4.10.38/build/pdf.worker.min.js';
+
+      const SOURCES = [
+        // local (recommended for environments that block CDNs)
+        { lib: './pdf.min.js', worker: './pdf.worker.min.js', note: 'local: ./pdf.min.js' },
+        { lib: './pdfjs/pdf.min.js', worker: './pdfjs/pdf.worker.min.js', note: 'local: ./pdfjs/pdf.min.js' },
+
+        // CDNs (fallback) - use a UMD build that exposes window.pdfjsLib
+        // (Newer PDF.js versions on CDNs may ship .mjs only; this is why we pin v3.4.120 here.)
+        { lib: 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.min.js',
+          worker: 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.worker.min.js',
+          note: 'cdnjs v3.4.120' },
+
+        { lib: 'https://unpkg.com/pdfjs-dist@3.4.120/build/pdf.min.js',
+          worker: 'https://unpkg.com/pdfjs-dist@3.4.120/build/pdf.worker.min.js',
+          note: 'unpkg pdfjs-dist@3.4.120' },
+
+        { lib: 'https://cdn.jsdelivr.net/npm/pdfjs-dist@3.4.120/build/pdf.min.js',
+          worker: 'https://cdn.jsdelivr.net/npm/pdfjs-dist@3.4.120/build/pdf.worker.min.js',
+          note: 'jsdelivr pdfjs-dist@3.4.120' },
+      ];
+
+      const loadScript = (src) => new Promise((resolve, reject) => {
+        const s = document.createElement('script');
+        s.src = src;
+        s.async = true;
+        s.crossOrigin = 'anonymous';
+        s.onload = () => resolve();
+        s.onerror = () => reject(new Error('script load failed: ' + src));
+        document.head.appendChild(s);
+      });
+
+      let lastErr = null;
+      for(const c of SOURCES){
+        try{
+          await loadScript(c.lib);
+          if(window.pdfjsLib){
+            // Worker source: set regardless; on file:// we disable worker later for safety.
+            pdfjsLib.GlobalWorkerOptions.workerSrc = c.worker;
+            setStatus('PDF.js 読み込み: ' + c.note);
+            return;
+          }
+        }catch(e){
+          lastErr = e;
+        }
       }
+
+      // help message: local deploy option
+      const help =
+        'PDF.js の読み込みに失敗しました。\n\n' +
+        '原因の例: (1) 社内ネットワークでCDNがブロックされている / (2) オフライン / (3) file:// で開いている等。\n\n' +
+        '対策: リポジトリ（index.htmlと同じ階層）に「pdf.min.js」「pdf.worker.min.js」を置くか、' +
+        'または「/pdfjs/pdf.min.js」「/pdfjs/pdf.worker.min.js」として配置してください。\n' +
+        '（このページはローカルファイルでも、GitHub Pagesでも動作します）';
+      const err = new Error(help);
+      if(lastErr) err.cause = lastErr;
+      throw err;
     }
 
     function getTextFieldsFromAnnotations(annots){
@@ -1351,10 +1407,10 @@
     }
 
     async function extractFromPdf(file){
-      ensurePdfJs();
+      await ensurePdfJs();
 
       const buf = await file.arrayBuffer();
-      const loadingTask = pdfjsLib.getDocument({data: buf});
+      const loadingTask = pdfjsLib.getDocument({ disableWorker: true, data: buf});
       const pdf = await loadingTask.promise;
 
       const debug = {numPages: pdf.numPages};
