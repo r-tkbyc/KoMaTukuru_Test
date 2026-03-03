@@ -1,0 +1,26 @@
+{
+  "manifest_version": 3,
+  "name": "KoMaTukuru to CMS",
+  "version": "1.0.0",
+  "description": "KoMaTukuruの整形結果を高島屋CMSの記事新規作成画面へ空欄のみ自動入力する",
+  "permissions": ["tabs"],
+  "host_permissions": [
+    "https://r-tkbyc.github.io/*",
+    "https://cmstakashimaya.com/*"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": ["https://r-tkbyc.github.io/KoMaTukuru*"],
+      "js": ["koma_inject.js"],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": ["https://cmstakashimaya.com/webadmin/addon/store/article/create/*"],
+      "js": ["cms_inject.js"],
+      "run_at": "document_idle"
+    }
+  ]
+}

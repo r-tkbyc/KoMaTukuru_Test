@@ -1,0 +1,949 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <!-- Text Formatter v1.0.6 - 2026-01-05 -->
+  <meta name="app-version" content="v1.0.6">
+  
+  <title>KoMaTukuru テキスト整形ツール</title>
+  <style>
+  :root { --gap: 8px; }
+  * { box-sizing: border-box; }
+  body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Noto Sans JP, Helvetica, Arial, sans-serif; margin: 0; background: #0b0f14; color: #e6edf3; }
+  header { padding: 10px 14px; border-bottom: 1px solid #22303e; background: #0f1620; }
+  h1 { margin: 0; font-size: 18px; font-weight: 700; }
+  main { padding: 12px; max-width: 1200px; margin: 0 auto; }
+
+  .set { display: flex; flex-direction: column; gap: var(--gap); margin-top: 14px; background: #0f1620; border: 1px solid #22303e; border-radius: 8px; padding: 8px; }
+  .set-head { display: flex; align-items: center; justify-content: space-between; gap: 6px; }
+  .set-title { margin: 0; font-size: 13px; color: #c9d6e2; font-weight: 700; }
+  .actions { display: flex; gap: 6px; align-items: center; }
+
+  .row { display: grid; grid-template-columns: 1fr; gap: var(--gap); }
+  @media (min-width: 960px) { .row { grid-template-columns: 1fr 1fr; } }
+
+  /* 本文用：常に縦並び */
+  .row-vertical { display: grid; grid-template-columns: 1fr; gap: var(--gap); }
+  @media (min-width: 960px) { .row-vertical { grid-template-columns: 1fr; } }
+
+  .panel { background: #0b121a; border: 1px solid #22303e; border-radius: 6px; padding: 8px; display: flex; flex-direction: column; gap: 6px; }
+  .panel h2 { margin: 0 0 2px; font-size: 12px; font-weight: 700; color: #9fb3c8; }
+
+  textarea { width: 100%; min-height: 60px; resize: vertical; background: #0b121a; color: #e6edf3; border: 1px solid #22303e; border-radius: 6px; padding: 10px; line-height: 1.45; font-size: 13px; }
+  textarea[readonly] { opacity: .95; }
+
+  button { cursor: pointer; border: 1px solid #2a3a4b; background: #132032; color: #e6edf3; border-radius: 6px; padding: 6px 10px; font-size: 12px; }
+  button:hover { background: #18283d; }
+  button:active { transform: translateY(1px); }
+  .primary { background: #2155cd; border-color: #2155cd; }
+
+  .toast { position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%); background: rgba(20,30,45,.95); border: 1px solid #2a3a4b; padding: 10px 14px; border-radius: 10px; color: #e6edf3; font-size: 13px; opacity: 0; pointer-events: none; transition: opacity .25s ease; }
+  .toast.show { opacity: 1; }
+
+  .dates-row{display:flex;gap:12px}
+  .date-col{flex:1;display:flex;flex-direction:column;gap:6px}
+  .date-label{font-size:12px;color:#9fb3c8}
+  .date-field{width:100%;min-height:44px;resize:vertical;background:#0b121a;color:#e6edf3;border:1px solid #22303e;border-radius:6px;padding:8px;line-height:1.4;font-size:12px}
+  [data-set="kaiki"] .kaiki-output{min-height:60px}
+  .date-head{display:flex;align-items:center;justify-content:space-between;gap:8px}
+  .btn-compact{padding:5px 8px;font-size:12px;line-height:1}
+  .year-wrap{display:inline-flex;align-items:center;margin-right:4px}
+  .year-select{appearance:none;background:#132032;border:1px solid #2a3a4b;color:#e6edf3;border-radius:6px;padding:4px 8px;font-size:12px}
+  .year-select:focus{outline:none}
+  .dt-wrap{display:inline-flex;align-items:center;margin-right:4px}
+  .dt-select{appearance:none;background:#132032;border:1px solid #2a3a4b;color:#e6edf3;border-radius:6px;padding:4px 8px;font-size:12px}
+  .dt-select:disabled{opacity:.6}
+  .title-inline{display:flex;align-items:center;gap:8px}
+  .dtfree-wrap{display:inline-flex;align-items:center}
+  .dt-free{background:#132032;border:1px solid #2a3a4b;color:#e6edf3;border-radius:6px;padding:4px 8px;font-size:12px}
+
+  /* === Unity-like compact theme overrides (CSS-only) === */
+  :root { --gap: 6px; }
+  body { background:#383838; color:#dcdcdc; }
+  header { background:#383838; border-bottom:1px solid #222; padding:8px 12px; }
+  h1 { font-size:14px; font-weight:600; color:#dcdcdc; }
+  main { padding:10px; }
+  .set { background:#383838; border:1px solid #222; border-radius:2px; padding:6px; margin-top:10px; }
+  .set-title { font-size:12px; color:#e0e0e0; }
+  .actions { gap:5px; }
+  .panel { background:#383838; border:1px solid #222; border-radius:2px; padding:6px; gap:6px; }
+  .panel h2 { font-size:11px; color:#bfbfbf; margin:0 0 2px; font-weight:600; }
+  textarea { background:#2a2a2a; border:1px solid #3b3b3b; border-radius:2px; color:#e3e3e3; padding:8px; line-height:1.4; font-size:12px; }
+  textarea[readonly]{opacity:.98;}
+  textarea:focus, select:focus, input:focus, button:focus { outline:1px solid #2a81fb; outline-offset:0; box-shadow:0 0 0 1px #2a81fb inset; }
+  button, .year-select, .dt-select, .dt-free { background:#585858; border:1px solid #111111; color:#eaeaea; border-radius:2px; padding:4px 8px; font-size:12px; }
+  button:hover { background:#4a4a4a; }
+  button:active { background:#5a5a5a; transform:none; }
+  .primary { background:#585858; border-color:#222; color:#ffffff; }
+  .date-field { background:#2a2a2a; border:1px solid #3b3b3b; border-radius:2px; padding:6px; min-height:40px; font-size:12px; }
+  .date-label { color:#bfbfbf; font-size:11px; }
+  .toast { background:rgba(46,46,46,.98); border:1px solid #3b3b3b; color:#dedede; font-size:12px; }
+
+  /* === Tighten spacing === */
+  :root { --gap: 4px; }
+  header { padding: 6px 10px; }
+  .set { padding: 4px; margin-top: 8px; }
+  .set-title { font-size: 11.5px; }
+  .actions { gap: 4px; }
+  .panel { padding: 4px; gap: 4px; }
+  .panel h2 { font-size: 11px; margin: 0 0 1px; }
+  textarea { padding: 6px; line-height: 1.35; font-size: 12px; min-height: 60px; }
+  button, .year-select, .dt-select, .dt-free { padding: 3px 8px; font-size: 11px; }
+  .btn-compact { padding: 3px 6px; font-size: 11px; }
+  .date-field { min-height: 36px; padding: 6px; font-size: 12px; line-height: 1.3; }
+  .toast { font-size: 11px; padding: 8px 10px; }
+
+  /* === Mini font scale === */
+  body { font-size: 12px; }
+  h1 { font-size: 13px; }
+  .set-title { font-size: 11px; }
+  .panel h2 { font-size: 10px; }
+  textarea { font-size: 11px; line-height: 1.3; }
+  button, .year-select, .dt-select, .dt-free { font-size: 10px; padding: 2px 7px; }
+  .btn-compact { font-size: 10px; padding: 2px 6px; }
+  .date-field { font-size: 11px; min-height: 34px; padding: 5px; line-height: 1.25; }
+  .date-label { font-size: 10px; }
+  .toast { font-size: 10.5px; padding: 6px 8px; }
+
+  /* 本文（honbun）：入力・出力のデフォルト高さを現状の3倍に */
+  [data-set="honbun"] textarea { min-height: 180px; }
+
+  /* === Unified button heights === */
+  :root { --btn-h: 20px; }
+  button,
+  .btn-compact,
+  .btn-copy,
+  .btn-copy-date,
+  .btn-copy-start,
+  .btn-copy-end,
+  .btn-copy-dtfree {
+    height: var(--btn-h);
+    padding: 0 8px !important;
+    line-height: calc(var(--btn-h) - 2px);
+  }
+  .year-select, .dt-select, .dt-free {
+    height: var(--btn-h);
+    padding: 0 8px !important;
+    line-height: calc(var(--btn-h) - 2px);
+  }
+  header { display:flex; align-items:center; justify-content:space-between; }
+  .ver-badge { font-size:10px; background:#3d3d3d; border:1px solid #565656; color:#eaeaea;
+    border-radius:2px; padding:0 6px; line-height:18px; height:18px; white-space:nowrap; }
+
+  /* 店舗ラジオ：チェック時の色 */
+  .store-group input[type="radio"]{
+    accent-color: #2a81fb; /* 好きな色に変更可 */
+  }
+  </style>
+</head>
+
+<body>
+  <header>
+    <h1>KoMaTukuru テキスト整形ツール</h1>
+    <button id="ver" class="ver-badge"></button>
+  </header>
+  <main>
+    <!-- タイトル セット -->
+    <section class="set" data-set="title">
+      <div class="set-head">
+        <h2 class="set-title">タイトル</h2>
+        <div class="actions">
+          <button class="btn-convert primary" title="変換（Ctrl/Cmd+Enter）">&nbsp;変換&nbsp;</button>
+          <button class="btn-copy" title="コピー">コピー</button>
+        </div>
+      </div>
+      <div class="row">
+        <section class="panel">
+          <h2>入力</h2>
+          <textarea class="input" placeholder="ここにテキストをペースト"></textarea>
+        </section>
+        <section class="panel">
+          <h2>出力</h2>
+          <textarea class="output" placeholder="ここに整形結果が表示されます" readonly></textarea>
+        </section>
+      </div>
+    </section>
+
+    <!-- 会期 セット -->
+    <section class="set" data-set="kaiki">
+      <div class="set-head">
+        <div class="title-inline">
+          <h2 class="set-title">会期</h2>
+          <label class="dtfree-wrap" title="任意の日時（会期とは独立）">
+            <input type="datetime-local" class="dt-free" step="60">
+          </label>
+          <button class="btn-copy-dtfree btn-compact" title="日時をコピー">コピー</button>
+          <div class="store-group" role="radiogroup" aria-label="店舗">
+            <label class="radio"><input type="radio" name="store" value="nihonbashi"><span>日本橋</span></label>
+            <label class="radio"><input type="radio" name="store" value="shinjuku" checked><span>新宿</span></label>
+          </div>
+        </div>
+        <div class="actions">
+          <label class="year-wrap" title="年（未記載時の基準年）">
+            <select class="year-select">
+              <option value="2025">2025</option>
+              <option value="2026" selected>2026</option>
+              <option value="2027">2027</option>
+              <option value="2028">2028</option>
+              <option value="2029">2029</option>
+              <option value="2030">2030</option>
+            </select>
+          </label>
+          <button class="btn-convert primary" title="変換（Ctrl/Cmd+Enter)">&nbsp;変換&nbsp;</button>
+          <button class="btn-copy" title="コピー">コピー</button>
+        </div>
+      </div>
+      <div class="row">
+        <section class="panel">
+          <h2>入力</h2>
+          <textarea class="input" placeholder="ここにテキストをペースト"></textarea>
+        </section>
+        <section class="panel">
+          <h2>出力</h2>
+          <textarea class="output kaiki-output" placeholder="ここに整形結果が表示されます" readonly></textarea>
+          <div class="dates-row">
+            <div class="date-col">
+              <div class="date-head">
+                <div class="date-label">開始日</div>
+                <button class="btn-copy-date btn-copy-start btn-compact" title="開始日をコピー">コピー</button>
+              </div>
+              <textarea class="date-field date-start" placeholder="開始日（自動抽出）" readonly></textarea>
+            </div>
+            <div class="date-col">
+              <div class="date-head">
+                <div class="date-label">終了日</div>
+                <button class="btn-copy-date btn-copy-end btn-compact" title="終了日をコピー">コピー</button>
+              </div>
+              <textarea class="date-field date-end" placeholder="終了日（自動抽出）" readonly></textarea>
+            </div>
+          </div>
+        </section>
+      </div>
+    </section>
+
+    <!-- 会場 セット -->
+    <section class="set" data-set="venue">
+      <div class="set-head">
+        <h2 class="set-title">会場</h2>
+        <div class="actions">
+          <button class="btn-convert primary" title="変換（Ctrl/Cmd+Enter）">&nbsp;変換&nbsp;</button>
+          <button class="btn-copy" title="コピー">コピー</button>
+        </div>
+      </div>
+      <div class="row">
+        <section class="panel">
+          <h2>入力</h2>
+          <textarea class="input" placeholder="ここにテキストをペースト"></textarea>
+        </section>
+        <section class="panel">
+          <h2>出力</h2>
+          <textarea class="output" placeholder="ここに整形結果が表示されます" readonly></textarea>
+        </section>
+      </div>
+    </section>
+
+    <!-- 本文 セット -->
+    <section class="set" data-set="honbun">
+      <div class="set-head">
+        <h2 class="set-title">本文</h2>
+        <div class="actions">
+          <button class="btn-convert primary" title="変換（Ctrl/Cmd+Enter）">&nbsp;変換&nbsp;</button>
+          <button class="btn-copy" title="コピー">コピー</button>
+        </div>
+      </div>
+      <div class="row-vertical">
+        <section class="panel">
+          <h2>入力</h2>
+          <textarea class="input" placeholder="ここにテキストをペースト"></textarea>
+        </section>
+        <section class="panel">
+          <h2>出力</h2>
+          <textarea class="output" placeholder="ここに整形結果が表示されます" readonly></textarea>
+        </section>
+      </div>
+    </section>
+  </main>
+
+  <div class="toast" id="toast"></div>
+
+  <script>
+  const APP_VERSION = "v1.0.6";
+  const APP_BUILD = "2026-01-05";
+
+  // 価格直前の全角スペース付与を将来再有効化できるように保持
+  const PRICE_SPACE_RULE_ENABLED = false;
+
+  // 会場の注意書き(※…)から抽出した終了時刻の全体上書き（無ければ null）
+  window._venueEndHMOverride = null;
+
+  document.addEventListener("DOMContentLoaded", () => {
+    const el = document.getElementById("ver");
+    if (el) el.textContent = `${APP_VERSION} (${APP_BUILD})`;
+  });
+  // =============================
+  //  ルール適用パイプライン（全体）
+  //  今後の正規表現ルールは rulesGlobal に関数追加
+  // =============================
+  const rulesGlobal = [];
+  // 1) URL保護＋URL内の全角→半角
+  rulesGlobal.push(function urlProtect(s){
+    const urlRegex = /(https?:\/\/[!-~]+)/g;
+    const bucket = [];
+    const out = String(s||'').replace(urlRegex, (m) => {
+      const half = m
+        .replace(/[Ａ-Ｚａ-ｚ０-９]/g, ch => String.fromCharCode(ch.charCodeAt(0)-0xFEE0))
+        .replace(/[！-～]/g,       ch => String.fromCharCode(ch.charCodeAt(0)-0xFEE0))
+        .replace(/[‐―－ー‒–—−]/g, '-');
+      const key = `⟦URL${bucket.length}⟧`;
+      bucket.push(half);
+      return key;
+    });
+    return { text: out, ctx: { urls: bucket } };
+  });
+  // 1.5) 計量単位の互換文字 → ASCII（㎝, ㎖, ㎜）
+  rulesGlobal.push(function siCompatUnits(s){
+    // U+339D: ㎝, U+3396: ㎖, U+339C: ㎜
+    return String(s||'').replace(/\u339D/g, 'cm')
+                        .replace(/\u3396/g, 'ml')
+                        .replace(/\u339C/g, 'mm');
+  });
+  // 1.2) ［］は常に全角、～は常に全角（URLはurlProtectで保護済み）
+  rulesGlobal.push(function fullwidthBracketsAndWave(s){
+    return String(s||'')
+      // 半角角カッコ → 全角
+      .replace(/\[/g, '［')
+      .replace(/\]/g, '］')
+      // 半角チルダ "~" と JIS波ダッシュ "〜" → 全角チルダ "～"
+      .replace(/[\u007E\u301C]/g, '～')
+      // 半角矢印 "→" も全角チルダ "～" に統一
+      .replace(/→/g, '～');
+  });
+  // 2.x) 用語ゆれ・表記統一（全体適用）
+  // ※順序注意：POPUPSTORE → POPUPSHOP → POPUP の順でマッチさせる
+  rulesGlobal.push(function lexicalReplacements(s){
+    return String(s || '')
+      // 英字（大文字固定の指定どおり。小文字や混在大小は変更しません）
+      .replace(/POPUPSTORE/g, 'POP UP STORE')
+      .replace(/POPUPSHOP/g, 'POP UP SHOP')
+      .replace(/POPUP/g, 'POP UP')
+
+      // 和文
+      .replace(/是非/g, 'ぜひ')
+      .replace(/くださいませ/g, 'ください')
+      .replace(/お買い上げ/g, 'お買上げ')
+      .replace(/お買いあげ/g, 'お買上げ')
+      .replace(/致します/g, 'いたします')
+      .replace(/ラインナップ/g, 'ラインアップ')
+      .replace(/髙島屋/g, '高島屋');
+  });
+
+  // 2) 英数は半角、記号は全角（空白は半角維持）/ 記号のゆれ正規化
+  rulesGlobal.push(function widthNorm(s){
+    const toHalfAlnum = x => x.replace(/[Ａ-Ｚａ-ｚ０-９]/g, ch => String.fromCharCode(ch.charCodeAt(0)-0xFEE0));
+    const toHalfDigits= x => x.replace(/[０-９]/g,           ch => String.fromCharCode(ch.charCodeAt(0)-0xFEE0));
+    const toFullWidthSymbols = x => x.replace(/[\x21-\x7E]/g, ch => {
+      if (/[A-Za-z0-9]/.test(ch)) return ch;
+      if (ch === ' ') return ch;
+      return String.fromCharCode(ch.charCodeAt(0) + 0xFEE0);
+    });
+    let body = toHalfAlnum(s);
+    body = toFullWidthSymbols(body);
+    body = toHalfDigits(body);
+    // 括弧・記号の個別置換
+    body = body
+      .replace(/\(/g,'（').replace(/\)/g,'）')
+      .replace(/\[/g,'［').replace(/\]/g,'］')
+      .replace(/\{/g,'｛').replace(/\}/g,'｝')
+      .replace(/</g,'＜').replace(/>/g,'＞')
+      .replace(/＜/g,'〈').replace(/＞/g,'〉')
+      .replace(/≪/g,'《').replace(/≫/g,'》')
+      .replace(/【/g,'〔').replace(/】/g,'〕')
+      .replace(/\*/g,'※').replace(/＊/g,'※');
+    // 連続英数字の中に入る記号の半角統一
+    body = body.replace(/[A-Za-z0-9０-９]+[\p{P}\p{S}]+(?=[A-Za-z0-9０-９]+)/gu, seg =>
+      seg.replace(/[！-～]/g, ch => {
+        // 括弧類は常に全角で保持（英数字に挟まれていても半角に戻さない）
+        const keep = '（）［］｛｝「」『』《》〔〕〈〉';
+        if (keep.includes(ch)) return ch;
+        return String.fromCharCode(ch.charCodeAt(0) - 0xFEE0);
+      }).replace(/[‐―－ー‒–—−]/g, '-')
+    );
+    return body;
+  });
+
+  // 2.5) TEL のコロンは必ず全角に固定（widthNorm の後に実行して確定させる）
+  rulesGlobal.push(function fixTelColon(s){
+    return String(s || '').replace(/\bTEL[:：]/g, 'TEL：');
+  });
+
+  // Excelコピー等で混ざる TAB を半角スペースへ（連続TABもスペース1個）
+  rulesGlobal.push(function tabToSpace(s){
+    return String(s || '').replace(/\t+/g, ' ');
+  });
+
+  // 3) スペース/改行ルール
+  rulesGlobal.push(function spaceBreak(s){
+    return s
+      .replace(/[ 　]+/g,' ')
+      .replace(/(\r?\n){3,}/g,'\n\n');
+  });
+
+  // 3.5) 価格の直前に全角スペースを付与（「税込…円以上」は除外）
+  rulesGlobal.push(function ensureZenkakuSpaceBeforePrice(s){
+    if (!PRICE_SPACE_RULE_ENABLED) return s;  // ← これを先頭に追加
+    const str = String(s || '');
+    // 先頭の空白（半/全角）+ 数字（カンマ区切りOK）+ 「円」
+    const priceRe = /([ 　]*)(\d{1,3}(?:,\d{3})+|\d+)([ 　]*円)/g;
+
+    return str.replace(priceRe, (match, ws, num, yenPart, offset) => {
+      const prev = str.slice(0, offset);
+      const next = str.slice(offset + match.length);
+
+      // 「税込」直後かつ「円」の直後が「以上」→除外
+      if (prev.endsWith('税込') && next.startsWith('以上')) {
+        return match;
+      }
+
+      // 行頭/改行直後は視認性のため挿入しない（必要ならここを '　' + ... に変更）
+      const prevChar = prev.slice(-1);
+      const atLineStart = offset === 0 || prevChar === '\n' || prevChar === '\r';
+      if (atLineStart) {
+        return `${num}${yenPart}`;
+      }
+
+      // それ以外は直前を必ず全角スペース1つに統一
+      return `　${num}${yenPart}`;
+    });
+  });
+
+  // 4) URL復元
+  rulesGlobal.push(function urlRestore(s, ctx){
+    return String(s||'').replace(/⟦URL(\d+)⟧/g, (_, i) => (ctx.urls||[])[Number(i)] ?? '');
+  });
+
+  // 変換エントリ（全体ルール適用）
+  function transform(text){
+    // パイプラインを順に適用、ctxを共有
+    let ctx = {};
+    let current = String(text||'');
+    for (const rule of rulesGlobal){
+      if (typeof rule === 'function'){
+        const r = rule(current, ctx);
+        if (typeof r === 'string'){ current = r; }
+        else if (r && typeof r === 'object' && 'text' in r){ current = r.text; ctx = { ...(ctx||{}), ...(r.ctx||{}) }; }
+      }
+    }
+    return current;
+  }
+
+  // =============================
+  //  会期ヘルパー
+  // =============================
+  const _d2 = (n)=>String(n).padStart(2,'0');
+  const _fmt = (y,m,d,hh,mm)=>`${y}/${_d2(m)}/${_d2(d)} ${_d2(hh)}:${_d2(mm)}`;
+  const _wJP = (date)=>['日','月','火','水','木','金','土'][date.getDay()];
+  const _toHalfDigits = (s)=>String(s||'').replace(/[０-９]/g, ch => String.fromCharCode(ch.charCodeAt(0)-0xFEE0));
+
+  function _getSelectedStore(){
+    // デフォルトは 'shinjuku'
+    return document.querySelector('input[name="store"]:checked')?.value || 'shinjuku';
+  }
+
+  /**
+   * 店舗と曜日に応じた既定の終了時刻（※があれば overrideHM が最優先）
+   * 優先度: 会期※ > 会場※ > 店舗デフォルト
+   */
+  function _defaultEndHMByStore(endDate, overrideHM){
+    // 1) 会期の※（行末注記）
+    if (overrideHM) return overrideHM;
+
+    // 2) 会場由来の上書き
+    if (window._venueEndHMOverride) return window._venueEndHMOverride;
+
+    // 3) 店舗デフォルト（従来挙動）
+    const store = _getSelectedStore();      // 'shinjuku' | 'nihonbashi'
+    const isTue = endDate.getDay() === 2;   // 火曜？
+
+    let hh = 19, mm = 30;
+    if (store === 'shinjuku') {
+      hh = isTue ? 17 : 19;
+    } else if (store === 'nihonbashi') {
+      hh = 19; // 火曜でも 19:30
+    }
+    return { hh, mm };
+  }
+
+  function _normalize(raw){
+    let s = _toHalfDigits(raw||'');
+    '〜～~-‐―—−→'.split('').forEach(c => { s = s.split(c).join('～'); });
+    s = s.split('(').join('（').split(')').join('）');
+    s = s.replace(/[ 　]/g,'');
+    return s;
+  }
+
+  // 範囲（～）
+  function _parseRange(raw, baseYear){
+    const s = _normalize(raw);
+    const i = s.indexOf('～'); if (i === -1) return null;
+    const L = s.slice(0,i), R = s.slice(i+1);
+
+    const yL = L.match(/([0-9]{4})年/);
+    const sy = yL ? +yL[1] : (baseYear||2026);
+
+    let sm, sd;
+    let m = L.match(/([0-9]{1,2})月([0-9]{1,2})日/);
+    if (m){ sm=+m[1]; sd=+m[2]; }
+    else { m=L.match(/([0-9]{1,2})\/([0-9]{1,2})/); if(!m) return null; sm=+m[1]; sd=+m[2]; }
+
+    let lMark=''; const lp=L.match(/（([^）]+)）/); if(lp){ const t=lp[1]; if(t.includes('祝')) lMark='・祝'; else if(t.includes('振')) lMark='・振'; }
+
+    let ey=sy, em=sm, ed=null;
+    const yR=R.match(/([0-9]{4})年/); if(yR) ey=+yR[1];
+
+    let hasRM=false;
+    let mr=R.match(/([0-9]{1,2})月([0-9]{1,2})日(?:（[^）]*）)?/);
+    if (mr){ em=+mr[1]; ed=+mr[2]; hasRM=true; }
+    else { mr=R.match(/([0-9]{1,2})\/([0-9]{1,2})(?:（[^）]*）)?/);
+           if(mr){ em=+mr[1]; ed=+mr[2]; hasRM=true; }
+           else { mr=R.match(/^([0-9]{1,2})日?(?:（[^）]*）)?$/); if(!mr) return null; ed=+mr[1]; } }
+    if (!yR && hasRM && em < sm) ey = sy + 1;
+
+    let rMark=''; const rp=R.match(/（([^）]+)）/); if(rp){ const t=rp[1]; if(t.includes('祝')) rMark='・祝'; else if(t.includes('振')) rMark='・振'; }
+
+    return { sy, sm, sd, ey, em, ed, lMark, rMark };
+  }
+  function _outRange(info){
+    const wk1 = _wJP(new Date(info.sy, info.sm-1, info.sd));
+    const wk2 = _wJP(new Date(info.ey, info.em-1, info.ed));
+    const left  = `${info.sm}月${info.sd}日（${wk1}${info.lMark||''}）`;
+    const right = `${info.em===info.sm?'':info.em+'月'}${info.ed}日（${wk2}${info.rMark||''}）`;
+    return `■${left}～${right}`;
+  }
+  function _timesRange(info, overrideHM){
+    const end = new Date(info.ey, info.em-1, info.ed);
+    const endHM = _defaultEndHMByStore(end, overrideHM);
+    return {
+      startStr: _fmt(info.sy, info.sm, info.sd, 10, 30),
+      endStr:   _fmt(info.ey, info.em, info.ed, endHM.hh, endHM.mm)
+    };
+  }
+
+  // 列挙（・）
+  function _parseList(raw, baseYear){
+    if (!raw || raw.indexOf('・') === -1) return null;
+    let s = _toHalfDigits(raw);
+    s = s.split('(').join('（').split(')').join('）').replace(/[ 　]/g,'');
+    if (s.startsWith('■')) s = s.slice(1);
+
+    // 括弧外の「・」で分割
+    const parts = (() => {
+      const out=[]; let buf=''; let depth=0;
+      for (const ch of s){
+        if (ch==='（') { depth++; buf+=ch; continue; }
+        if (ch==='）') { if (depth>0) depth--; buf+=ch; continue; }
+        if (ch==='・' && depth===0) { out.push(buf); buf=''; continue; }
+        buf+=ch;
+      }
+      if (buf!=='') out.push(buf);
+      return out;
+    })();
+    if (parts.length<2) return null;
+
+    const list=[]; let pm=null, py=null; const base=baseYear||2026;
+    for (const p of parts){
+      let mark=''; const par=p.match(/（([^）]+)）/); if(par){ const t=par[1]; if(t.includes('祝')) mark='・祝'; else if(t.includes('振')) mark='・振'; }
+      let y=null,m=null,d=null;
+      const ym=p.match(/([0-9]{4})年/); if(ym) y=+ym[1];
+      let md=p.match(/([0-9]{1,2})月([0-9]{1,2})日/);
+      if(md){ m=+md[1]; d=+md[2]; }
+      else { md=p.match(/(^|[^0-9])([0-9]{1,2})日/); if(md) d=+md[2]; }
+      if(d==null) return null;
+      if(m==null){ const mm=p.match(/([0-9]{1,2})\//); if(mm) m=+mm[1]; }
+      if(m==null){ if(pm==null) return null; m=pm; }
+      if(y==null){ if(py==null) y=base; else y=(m<pm)?py+1:py; }
+      list.push({y,m,d,mark}); pm=m; py=y;
+    }
+    return list;
+  }
+  function _outList(list){
+    const segs=[];
+    for(let i=0;i<list.length;i++){
+      const t=list[i], prev=list[i-1];
+      const wk=_wJP(new Date(t.y,t.m-1,t.d));
+      const head = (!prev||prev.m!==t.m) ? `${t.m}月${t.d}日` : `${t.d}日`;
+      segs.push(`${head}（${wk}${t.mark||''}）`);
+    }
+    return '■'+segs.join('・');
+  }
+  function _timesList(list, overrideHM){
+    const f = list[0], l = list[list.length-1];
+    const end = new Date(l.y, l.m-1, l.d);
+    const endHM = _defaultEndHMByStore(end, overrideHM);
+    return {
+      startStr: _fmt(f.y, f.m, f.d, 10, 30),
+      endStr:   _fmt(l.y, l.m, l.d, endHM.hh, endHM.mm)
+    };
+  }
+
+  // 単日
+  function _parseSingle(raw, baseYear){
+    let s = _toHalfDigits(raw||'');
+    s = s.replace(/^\s*■/,'');
+    s = s.split('(').join('（').split(')').join('）');
+    s = s.replace(/[ 　]/g,'');
+    let y=null,m=null,d=null;
+    const yM = s.match(/([0-9]{4})年/); if(yM) y=+yM[1];
+    let md = s.match(/([0-9]{1,2})月([0-9]{1,2})日/);
+    if(md){ m=+md[1]; d=+md[2]; }
+    else { md = s.match(/([0-9]{1,2})\/([0-9]{1,2})/); if(md){ m=+md[1]; d=+md[2]; } }
+    if(m==null||d==null) return null;
+    if(y==null) y=baseYear||2026;
+    let mark=''; const par=s.match(/（([^）]+)）/); if(par){ const t=par[1]; if(t.includes('祝')) mark='・祝'; else if(t.includes('振')) mark='・振'; }
+    return {y,m,d,mark};
+  }
+  function _outSingle(one){
+    const wk = _wJP(new Date(one.y,one.m-1,one.d));
+    return `■${one.m}月${one.d}日（${wk}${one.mark||''}）`;
+  }
+  function _timesSingle(one, overrideHM){
+    const d = new Date(one.y, one.m-1, one.d);
+    const endHM = _defaultEndHMByStore(d, overrideHM);
+    return {
+      startStr: _fmt(one.y, one.m, one.d, 10, 30),
+      endStr:   _fmt(one.y, one.m, one.d, endHM.hh, endHM.mm)
+    };
+  }
+
+  // 「開催中～○月○日」専用（右側のみ解析）
+  function _parseRightOnly(raw, baseYear){
+    const n = _normalize(raw||'');
+    const i = n.indexOf('～'); if (i===-1) return null;
+    const left = n.slice(0,i);
+    if (left !== '開催中') return null;
+    const R = n.slice(i+1);
+    let y = (R.match(/([0-9]{4})年/)) ? Number(RegExp.$1) : (baseYear || 2026);
+    let m,d;
+    let mr = R.match(/([0-9]{1,2})月([0-9]{1,2})日/);
+    if (mr){ m=+mr[1]; d=+mr[2]; }
+    else {
+      mr = R.match(/([0-9]{1,2})\/([0-9]{1,2})/);
+      if (!mr) return null;
+      m=+mr[1]; d=+mr[2];
+    }
+    let rMark=''; const rp=R.match(/（([^）]+)）/);
+    if(rp){ const t=rp[1]; if(t.includes('祝')) rMark='・祝'; else if(t.includes('振')) rMark='・振'; }
+    return {y,m,d,rMark};
+  }
+  function _outRightOnly(o){
+    const wk=_wJP(new Date(o.y,o.m-1,o.d));
+    return `${o.m}月${o.d}日（${wk}${o.rMark||''}）`;
+  }
+  function _endStrFor(y, m, d, overrideHM){
+    const dt = new Date(y, m-1, d);
+    const endHM = _defaultEndHMByStore(dt, overrideHM);
+    return _fmt(y, m, d, endHM.hh, endHM.mm);
+  }
+
+  // 文末※（テキスト保持＆終了時刻上書き抽出）
+  function _extractNote(src){
+    const s = String(src || '');
+    const m = s.match(/[ 　]*[＊*※]\s*(.+)$/);
+    if (!m) return { text:'', endHM:null };
+
+    // 表示用の元テキスト（※を付ける）
+    const text = '※' + m[1].trim();
+
+    // 時刻抽出用に数字だけ半角へ正規化して判定（午後４時 等に対応）
+    const normalized = _toHalfDigits(text);
+    const tm = normalized.match(/(午前|午後)\s*([0-9]{1,2})\s*時(?:\s*([0-9]{1,2})\s*分)?/);
+    if (!tm) return { text, endHM:null };
+
+    let hh = +tm[2], mm = tm[3] ? +tm[3] : 0;
+    if (tm[1] === '午後' && hh < 12) hh += 12;
+    if (tm[1] === '午前' && hh === 12) hh = 0;
+    return { text, endHM: { hh, mm } };
+  }
+  function _stripNote(src){ return String(src||'').replace(/[ 　]*[＊*※].+$/,''); }
+
+  // 会場：先頭に■付与
+  function ensureVenueBullets(text){
+    if(!text) return '';
+    return String(text).split(/\r?\n/).map(line=>{
+      const t=line.replace(/^\s+/, '');
+      if (t==='') return '';
+      return t.startsWith('■') ? t : ('■'+t);
+    }).join('\n');
+  }
+
+  // =============================
+  //  UI コントローラ
+  // =============================
+  const toastEl = document.getElementById('toast');
+  function toast(msg){
+    toastEl.textContent = msg;
+    toastEl.classList.add('show');
+    clearTimeout(toast._t);
+    toast._t = setTimeout(()=>toastEl.classList.remove('show'), 1200);
+  }
+
+  function makeSetController(setEl){
+    const $ = (sel)=>setEl.querySelector(sel);
+    const els = {
+      input: $('.input'), output: $('.output'),
+      convert: $('.btn-convert'), copy: $('.btn-copy'),
+      startField: $('.date-start'), endField: $('.date-end'),
+      copyStart: $('.btn-copy-start'), copyEnd: $('.btn-copy-end'),
+      yearSel: $('.year-select'),
+      dtFree: $('.dt-free'), copyDtFree: $('.btn-copy-dtfree'),
+    };
+
+    function onConvert(){
+      const src = els.input.value || '';
+      const setName = setEl.getAttribute('data-set');
+
+      if(setName === 'kaiki'){
+        const baseYear = els.yearSel ? Number(els.yearSel.value) : 2026; // ← 既定年フォールバックを 2026 に
+        const lines = String(src).split(/\r?\n/).filter(l => l.trim() !== '');
+        const outLines = []; const startLines = []; const endLines = [];
+
+        for(const lineRaw of lines){
+          const note = _extractNote(lineRaw);
+          const core = _stripNote(lineRaw);
+          let handled=false, outLine='', startStr='', endStr='';
+
+          // A) 開催中～
+          const nrm = _normalize(core);
+          const sep = nrm.indexOf('～');
+          if (!handled && sep !== -1 && nrm.slice(0,sep) === '開催中'){
+            const right = _parseRightOnly(core, baseYear);
+            if (right){
+              outLine = '■開催中～' + _outRightOnly(right);
+              if (note.text) outLine += ' ' + transform(note.text);
+              startStr = '';
+              endStr   = _endStrFor(right.y, right.m, right.d, note.endHM||null);
+              handled = true;
+            }
+          }
+
+          // B) 列挙（・）
+          if(!handled && core.includes('・')){
+            const list=_parseList(core, baseYear);
+            if(list){
+              const t=_timesList(list, note.endHM||null);
+              if(t){ startStr=t.startStr; endStr=t.endStr; }
+              outLine=_outList(list);
+              if (note.text) outLine += ' ' + transform(note.text);
+              handled=true;
+            }
+          }
+
+          // C) 範囲（～）
+          if(!handled && nrm.includes('～')){
+            const info=_parseRange(core, baseYear);
+            if(info){
+              const t=_timesRange(info, note.endHM||null);
+              if(t){ startStr=t.startStr; endStr=t.endStr; }
+              outLine=_outRange(info);
+              if (note.text) outLine += ' ' + transform(note.text);
+              handled=true;
+            }
+          }
+
+          // D) 単日
+          if(!handled){
+            const one=_parseSingle(core, baseYear);
+            if(one){
+              const t=_timesSingle(one, note.endHM||null);
+              if(t){ startStr=t.startStr; endStr=t.endStr; }
+              outLine=_outSingle(one);
+              if (note.text) outLine += ' ' + transform(note.text);
+              handled=true;
+            }
+          }
+
+          // E) フォールバック（全体ルール整形 + ※前半角スペース + 先頭■付与）
+          if(!handled){
+            let t = transform(lineRaw);
+            t = t.replace(/[ 　]*(※|\*|＊)/, ' $1');
+            if(!t.trim().startsWith('■')) t = '■' + t.trimStart();
+            outLine = t;
+          }
+
+          // 入力に「開催中」が含まれていたら必ず含める
+          const raw = String(lineRaw);
+          if (raw.includes('開催中～') || raw.includes('開催中→')) {
+            if (!outLine.includes('開催中～')) {
+              outLine = outLine.replace(/^■(?:開催中[ 　]?)*?/, '■開催中～');
+            }
+          } else if (raw.includes('開催中')) {
+            if (!outLine.includes('開催中')) {
+              outLine = outLine.replace(/^■/, '■開催中 ');
+            }
+          }
+          outLines.push(outLine);
+          startLines.push(startStr||'');
+          endLines.push(endStr||'');
+        }
+
+        els.output.value = outLines.join('\n');
+        if(els.startField) els.startField.value = startLines.join('\n');
+        if(els.endField)   els.endField.value   = endLines.join('\n');
+        toast('変換しました'); return;
+      }
+
+      if(setName === 'venue'){
+        const base = transform(src);
+
+        // --- 追加: 会場行の※から終了時刻を集約（最も早い時刻を採用） ---
+        const lines = String(src || '').split(/\r?\n/);
+        let picked = null; // {hh, mm}
+        for (const ln of lines){
+          const note = _extractNote(ln);
+          if (note.endHM){
+            if (!picked) picked = note.endHM;
+            else {
+              const a = picked.hh*60 + picked.mm;
+              const b = note.endHM.hh*60 + note.endHM.mm;
+              if (b < a) picked = note.endHM; // 早い方を採用
+            }
+          }
+        }
+        window._venueEndHMOverride = picked || null;
+
+        // 既存の会場出力
+        els.output.value = ensureVenueBullets(base);
+        toast('変換しました');
+
+        // --- 追加: 会期入力があれば自動で再変換して時刻へ反映 ---
+        const kaikiSet = document.querySelector('[data-set="kaiki"]');
+        if (kaikiSet){
+          const kaikiInput = kaikiSet.querySelector('.input');
+          const kaikiConvertBtn = kaikiSet.querySelector('.btn-convert');
+          if (kaikiInput && kaikiInput.value.trim() && kaikiConvertBtn){
+            kaikiConvertBtn.click();
+          }
+        }
+        return;
+      }
+
+      if (setName === 'honbun') {
+        // 本文：会期/会場を<p>で挿入 → 空行 <p><br></p> → 本文全体を<p>...</p>で囲み、各行末に<br>
+        const kaikiOutEl = document.querySelector('[data-set="kaiki"] .output');
+        const venueOutEl = document.querySelector('[data-set="venue"] .output');
+        const kaikiVal = (kaikiOutEl && kaikiOutEl.value) ? kaikiOutEl.value : '';
+        const venueVal = (venueOutEl && venueOutEl.value) ? venueOutEl.value : '';
+
+        const outLines = [];
+
+        // 先頭に会期/会場を <p> で挿入
+        if (kaikiVal.trim()) {
+          kaikiVal.split(/\r?\n/).forEach(l => { if (l.trim()) outLines.push(`<p>${l}</p>`); });
+        }
+        if (venueVal.trim()) {
+          venueVal.split(/\r?\n/).forEach(l => { if (l.trim()) outLines.push(`<p>${l}</p>`); });
+        }
+
+        // 空行 <p><br></p>
+        outLines.push('<p><br></p>');
+
+        // 本文全体を <p> ... </p> で囲む（各行末に <br>、空行は <br> のみ）
+        const body = transform(src || '');
+        const bodyLines = body.split(/\r?\n/);
+        let para = '<p>\n';
+        for (const line of bodyLines) {
+          if (line.trim() === '') {
+            para += '<br>\n';
+          } else {
+            para += line + '<br>\n';
+          }
+        }
+        para += '</p>';
+        outLines.push(para);
+
+        els.output.value = outLines.join('\n');
+        toast('変換しました');
+        return;
+      }
+
+      // タイトル（その他）
+      els.output.value = transform(src);
+      toast('変換しました');
+    }
+
+    async function copyText(text, okMsg){
+      if(!text){ toast('出力が空です'); return; }
+      try{
+        await navigator.clipboard.writeText(text);
+        toast(okMsg||'コピーしました'); return;
+      }catch{}
+      try{
+        const ta=document.createElement('textarea');
+        ta.value=text; ta.style.position='fixed'; ta.style.left='-9999px'; ta.setAttribute('readonly','');
+        document.body.appendChild(ta); ta.select(); document.execCommand('copy'); document.body.removeChild(ta);
+        toast(okMsg||'コピーしました');
+      }catch{ toast('コピーに失敗しました'); }
+    }
+
+    function onCopy(e){ e.preventDefault(); copyText(els.output.value||'', 'コピーしました'); }
+
+    if(els.convert) els.convert.addEventListener('click', onConvert);
+    if(els.copy)    els.copy.addEventListener('click', onCopy);
+    if(els.copyStart && els.startField) els.copyStart.addEventListener('click', (e)=>{ e.preventDefault(); copyText((els.startField.value||'').trim(), '開始日をコピーしました'); });
+    if(els.copyEnd && els.endField)     els.copyEnd.addEventListener('click',   (e)=>{ e.preventDefault(); copyText((els.endField.value||'').trim(),   '終了日をコピーしました'); });
+    if(els.copyDtFree && els.dtFree){
+      els.copyDtFree.addEventListener('click', (e)=>{
+        e.preventDefault();
+        const iso = els.dtFree.value || '';
+        if(!iso){ toast('日時を選択してください'); return; }
+        let f=iso;
+        if(iso.length>=16 && iso.indexOf('T')===10){
+          const y=iso.slice(0,4), mo=iso.slice(5,7), d=iso.slice(8,10), hh=iso.slice(11,13), mm=iso.slice(14,16);
+          f=`${y}/${mo}/${d} ${hh}:${mm}`;
+        }
+        copyText(f, '日時をコピーしました');
+      });
+    }
+
+    setEl.addEventListener('keydown', (e)=>{ if((e.ctrlKey||e.metaKey) && e.key==='Enter'){ e.preventDefault(); onConvert(); }});
+  }
+
+  [...document.querySelectorAll('.set')].map(makeSetController);
+  // v1.0.1: バージョン表記（右上）をクリアボタンとして機能させる（会期タイトル右横 .dt-free と 年セレクト と 店舗ラジオだけ保持）
+  (function(){
+    function clearAllExceptDtFreeAndStore(){
+      var nodes = document.querySelectorAll('input, textarea, select');
+      nodes.forEach(function(el){
+        // dt-free は保持
+        if (el.classList.contains('dt-free')) return;
+        // 店舗ラジオボタンも保持
+        if (el.type === 'radio' && el.name === 'store') return;
+        // 年セレクト（基準年）も保持
+        if (el.classList && el.classList.contains('year-select')) return;
+
+        if (el.tagName === 'SELECT') {
+          // 他のセレクトのみ初期化（year-select は上で return 済み）
+          el.selectedIndex = 0;
+        } else if (el.type === 'checkbox' || el.type === 'radio') {
+          el.checked = false;
+        } else {
+          el.value = '';
+        }
+      });
+      // 追加: 会場由来の上書きもリセット
+      window._venueEndHMOverride = null;
+      if (typeof toast === 'function') toast('クリアしました');
+    }
+
+    var vb = document.getElementById('ver');
+    if (vb) {
+      vb.addEventListener('click', function(e){
+        e.preventDefault();
+        clearAllExceptDtFreeAndStore();
+      });
+    }
+  })();
+</script>
+</body>
+</html>
