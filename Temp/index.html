@@ -136,7 +136,93 @@
   .store-group input[type="radio"]{
     accent-color: #2a81fb;
   }
-  </style>
+  
+  /* ===== PDF Import (non-breaking) ===== */
+  #pdfImportPanel{
+    margin: 10px 0 16px;
+    border: 1px solid #1f2937;
+    background: #0f172a;
+    border-radius: 8px;
+    padding: 10px 12px;
+  }
+  #pdfImportPanel .pdf-head{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap: 10px;
+    margin-bottom: 8px;
+  }
+  #pdfImportPanel .pdf-title{
+    font-size: 13px;
+    font-weight: 700;
+    letter-spacing: .02em;
+  }
+  #pdfImportPanel .pdf-actions{
+    display:flex;
+    align-items:center;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+  #pdfDropZone{
+    border: 1px dashed #334155;
+    background: #0b1220;
+    border-radius: 8px;
+    padding: 12px;
+    text-align:center;
+    color: #cbd5e1;
+    user-select: none;
+  }
+  #pdfDropZone.dragover{
+    outline: 2px solid #2a81fb;
+    outline-offset: 2px;
+  }
+  .pdf-btn{
+    height: var(--btn-h);
+    padding: 0 10px;
+    border-radius: 4px;
+    border: 1px solid #334155;
+    background: #111827;
+    color: #e6edf3;
+    font-size: 12px;
+    cursor: pointer;
+    display:inline-flex;
+    align-items:center;
+    justify-content:center;
+    line-height: calc(var(--btn-h) - 2px);
+    white-space: nowrap;
+  }
+  .pdf-btn[disabled]{
+    opacity: .5;
+    cursor: default;
+  }
+  #pdfStatus{
+    margin-top: 8px;
+    font-size: 12px;
+    color: #cbd5e1;
+    min-height: 16px;
+    white-space: pre-wrap;
+  }
+  #pdfDebug{
+    margin-top: 8px;
+  }
+  #pdfDebug summary{
+    cursor: pointer;
+    color: #93c5fd;
+    font-size: 12px;
+  }
+  #pdfDebugPre{
+    margin-top: 8px;
+    padding: 10px;
+    border-radius: 8px;
+    background:#0b1220;
+    border: 1px solid #1f2937;
+    overflow:auto;
+    max-height: 220px;
+    font-size: 11px;
+    color:#cbd5e1;
+  }
+
+</style>
 </head>
 
 <body>
@@ -145,6 +231,27 @@
     <button id="ver" class="ver-badge"></button>
   </header>
   <main>
+
+    <!-- PDF取り込み（エントリーシート） -->
+    <section id="pdfImportPanel" aria-label="PDF取り込み">
+      <div class="pdf-head">
+        <div class="pdf-title">PDF取り込み（エントリーシート）</div>
+        <div class="pdf-actions">
+          <label class="pdf-btn" for="pdfFile">PDFを選択</label>
+          <input id="pdfFile" type="file" accept="application/pdf" style="display:none">
+          <button type="button" id="pdfUndo" class="pdf-btn" disabled>元に戻す</button>
+          <button type="button" id="pdfClearInputs" class="pdf-btn">入力欄クリア</button>
+        </div>
+      </div>
+      <div id="pdfDropZone">ここにPDFをドロップ（または「PDFを選択」）</div>
+      <div id="pdfStatus"></div>
+      <details id="pdfDebug">
+        <summary>診断（抽出ログ）</summary>
+        <pre id="pdfDebugPre"></pre>
+      </details>
+    </section>
+
+
     <!-- タイトル セット -->
     <section class="set" data-set="title">
       <div class="set-head">
@@ -952,5 +1059,478 @@
     }
   })();
   </script>
+
+  <!-- PDF.js loader (NO OCR) - tries local first, then multiple CDNs -->
+<script>
+  (function(){
+    'use strict';
+
+    // ========= Config =========
+    const DEBUG_DEFAULT_OPEN = false; // set true if you want <details> open by default
+
+    // ========= Elements =========
+    const elFile = document.getElementById('pdfFile');
+    const elDrop = document.getElementById('pdfDropZone');
+    const elStatus = document.getElementById('pdfStatus');
+    const elUndo = document.getElementById('pdfUndo');
+    const elClear = document.getElementById('pdfClearInputs');
+    const elDebug = document.getElementById('pdfDebug');
+    const elDebugPre = document.getElementById('pdfDebugPre');
+
+    if(!elFile || !elDrop || !elStatus || !elUndo || !elClear || !elDebug || !elDebugPre){
+      // If the page structure changes, fail silently (do not break existing features)
+      return;
+    }
+
+    elDebug.open = !!DEBUG_DEFAULT_OPEN;
+
+    // ========= Helpers =========
+    function setStatus(msg){
+      elStatus.textContent = msg || '';
+    }
+
+    function setDebug(obj){
+      try{
+        elDebugPre.textContent = typeof obj === 'string' ? obj : JSON.stringify(obj, null, 2);
+      }catch(e){
+        elDebugPre.textContent = String(obj);
+      }
+    }
+
+    function normalizeCRLF(s){
+      return (s ?? '').toString().replace(/\r\n?/g, '\n');
+    }
+
+    function fireInput(el){
+      try{
+        el.dispatchEvent(new Event('input', {bubbles:true}));
+        el.dispatchEvent(new Event('change', {bubbles:true}));
+      }catch(e){}
+    }
+
+    function qsInput(setName){
+      return document.querySelector('[data-set="'+setName+'"] textarea.input');
+    }
+
+    function readCurrentInputs(){
+      return {
+        title: (qsInput('title')?.value ?? ''),
+        kaiki: (qsInput('kaiki')?.value ?? ''),
+        venue: (qsInput('venue')?.value ?? ''),
+        honbun: (qsInput('honbun')?.value ?? ''),
+      };
+    }
+
+    function writeInputs(values){
+      const mapping = {
+        title: qsInput('title'),
+        kaiki: qsInput('kaiki'),
+        venue: qsInput('venue'),
+        honbun: qsInput('honbun'),
+      };
+      for(const k of Object.keys(mapping)){
+        const el = mapping[k];
+        if(!el) continue;
+        el.value = values[k] ?? '';
+        fireInput(el);
+      }
+    }
+
+    let lastBackup = null;
+    function backupNow(){
+      lastBackup = readCurrentInputs();
+      elUndo.disabled = false;
+    }
+
+    function clearInputs(){
+      backupNow();
+      writeInputs({title:'', kaiki:'', venue:'', honbun:''});
+      setStatus('入力欄をクリアしました。');
+    }
+
+    // ========= PDF parsing =========
+    async function ensurePdfJs(){
+      if(window.pdfjsLib){
+        // already loaded
+        if(!pdfjsLib.GlobalWorkerOptions.workerSrc){
+          // default worker (only used if worker is enabled)
+          pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.worker.min.js';
+        }
+        return;
+      }
+
+      const SOURCES = [
+        // local (recommended for environments that block CDNs)
+        { lib: './pdf.min.js', worker: './pdf.worker.min.js', note: 'local: ./pdf.min.js' },
+        { lib: './pdfjs/pdf.min.js', worker: './pdfjs/pdf.worker.min.js', note: 'local: ./pdfjs/pdf.min.js' },
+
+        // CDNs (fallback) - use a UMD build that exposes window.pdfjsLib
+        // (Newer PDF.js versions on CDNs may ship .mjs only; this is why we pin v3.4.120 here.)
+        { lib: 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.min.js',
+          worker: 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.worker.min.js',
+          note: 'cdnjs v3.4.120' },
+
+        { lib: 'https://unpkg.com/pdfjs-dist@3.4.120/build/pdf.min.js',
+          worker: 'https://unpkg.com/pdfjs-dist@3.4.120/build/pdf.worker.min.js',
+          note: 'unpkg pdfjs-dist@3.4.120' },
+
+        { lib: 'https://cdn.jsdelivr.net/npm/pdfjs-dist@3.4.120/build/pdf.min.js',
+          worker: 'https://cdn.jsdelivr.net/npm/pdfjs-dist@3.4.120/build/pdf.worker.min.js',
+          note: 'jsdelivr pdfjs-dist@3.4.120' },
+      ];
+
+      const loadScript = (src) => new Promise((resolve, reject) => {
+        const s = document.createElement('script');
+        s.src = src;
+        s.async = true;
+        s.crossOrigin = 'anonymous';
+        s.onload = () => resolve();
+        s.onerror = () => reject(new Error('script load failed: ' + src));
+        document.head.appendChild(s);
+      });
+
+      let lastErr = null;
+      for(const c of SOURCES){
+        try{
+          await loadScript(c.lib);
+          if(window.pdfjsLib){
+            // Worker source: set regardless; on file:// we disable worker later for safety.
+            pdfjsLib.GlobalWorkerOptions.workerSrc = c.worker;
+            setStatus('PDF.js 読み込み: ' + c.note);
+            return;
+          }
+        }catch(e){
+          lastErr = e;
+        }
+      }
+
+      // help message: local deploy option
+      const help =
+        'PDF.js の読み込みに失敗しました。\n\n' +
+        '原因の例: (1) 社内ネットワークでCDNがブロックされている / (2) オフライン / (3) file:// で開いている等。\n\n' +
+        '対策: リポジトリ（index.htmlと同じ階層）に「pdf.min.js」「pdf.worker.min.js」を置くか、' +
+        'または「/pdfjs/pdf.min.js」「/pdfjs/pdf.worker.min.js」として配置してください。\n' +
+        '（このページはローカルファイルでも、GitHub Pagesでも動作します）';
+      const err = new Error(help);
+      if(lastErr) err.cause = lastErr;
+      throw err;
+    }
+
+    function getTextFieldsFromAnnotations(annots){
+      const out = [];
+      for(const a of annots || []){
+        // Widget annotations represent form fields
+        const isWidget = (a.subtype === 'Widget' || a.annotationType === 20);
+        const isText = (a.fieldType === 'Tx' || a.fieldType === 'Text' || a.fieldType === 'FreeText');
+        const v = a.fieldValue;
+        if(isWidget && isText && typeof v === 'string'){
+          const val = normalizeCRLF(v).replace(/\u0000/g,'');
+          if(val.trim().length){
+            out.push({
+              fieldName: a.fieldName || '',
+              value: val,
+              // rect is useful for debug only; not used for extraction decision
+              rect: a.rect || null
+            });
+          }
+        }
+      }
+      return out;
+    }
+
+    function scoreFeatures(val){
+      const s = val || '';
+      const len = s.length;
+      const lines = s.split('\n').length;
+      const startsBullet = /^\s*■/.test(s);
+      const hasDate = /[0-9０-９]{1,2}月[0-9０-９]{1,2}日/.test(s) || /\b\d{1,2}\/\d{1,2}\b/.test(s);
+      const hasRange = /[〜～]/.test(s) || /[\-－—]/.test(s);
+      const hasFloor = /[0-9０-９]+階|\b[0-9０-９]+F\b|地下|B[0-9０-９]/i.test(s);
+      const hasStopTime = /閉場|午後|午前|\d{1,2}[:：]\d{2}/.test(s);
+      const hasMeta = /カテゴリー|綴じ|画像|メール|バナー|hp\d|ｈｐ\d/i.test(s);
+      const punctuationCount = (s.match(/。/g) || []).length;
+      return {len, lines, startsBullet, hasDate, hasRange, hasFloor, hasStopTime, hasMeta, punctuationCount};
+    }
+
+    function classifyFromFormFields(fields){
+      // fields: [{value, fieldName}]
+      const candidates = fields.map(f => {
+        const value = (f.value || '').toString();
+        const feat = scoreFeatures(value);
+        const base = {fieldName: f.fieldName, value, feat};
+        // Scoring per category
+        const scoreKaiki =
+          (feat.hasDate ? 5 : 0) +
+          (feat.hasRange ? 3 : 0) +
+          (feat.startsBullet ? 2 : 0) +
+          (!feat.hasMeta ? 1 : -4) +
+          (feat.len <= 140 ? 1 : -4) +
+          (feat.hasFloor ? -2 : 0);
+
+        const scoreVenue =
+          (feat.startsBullet ? 3 : 0) +
+          (feat.hasFloor ? 5 : 0) +
+          (feat.hasStopTime ? 2 : 0) +
+          (!feat.hasMeta ? 1 : -4) +
+          (feat.hasDate && feat.hasRange ? -4 : 0) +
+          (feat.len <= 220 ? 1 : -3);
+
+        const scoreTitle =
+          ((feat.len >= 2 && feat.len <= 90) ? 5 : (feat.len <= 140 ? 1 : -4)) +
+          (feat.lines === 1 ? 2 : -1) +
+          (!feat.startsBullet ? 1 : -4) +
+          (!feat.hasDate ? 1 : -4) +
+          (!feat.hasMeta ? 1 : -4);
+
+        const scoreBody =
+          (feat.len >= 120 ? 6 : (feat.len >= 60 ? 2 : -4)) +
+          (feat.lines >= 3 ? 2 : 0) +
+          (feat.punctuationCount >= 2 ? 1 : 0) +
+          (!feat.hasMeta ? 2 : -4);
+
+        return {...base, scoreKaiki, scoreVenue, scoreTitle, scoreBody};
+      });
+
+      function pickBest(key, usedSet){
+        const sorted = candidates
+          .filter(c => !usedSet.has(c))
+          .slice()
+          .sort((a,b)=> (b[key]-a[key]) || (b.feat.len-a.feat.len));
+        return sorted[0] || null;
+      }
+
+      const used = new Set();
+      const picked = {title:null, kaiki:null, venue:null, honbun:null};
+
+      // pick distinctive ones first
+      picked.kaiki = pickBest('scoreKaiki', used); if(picked.kaiki) used.add(picked.kaiki);
+      picked.venue = pickBest('scoreVenue', used); if(picked.venue) used.add(picked.venue);
+      picked.honbun = pickBest('scoreBody', used);  if(picked.honbun) used.add(picked.honbun);
+      picked.title = pickBest('scoreTitle', used);  if(picked.title) used.add(picked.title);
+
+      const out = {
+        title: picked.title?.value || '',
+        kaiki: picked.kaiki?.value || '',
+        venue: picked.venue?.value || '',
+        honbun: picked.honbun?.value || '',
+      };
+
+      // Basic validation: must have at least 3/4, and kaiki must look like date range
+      const okKaiki = /月/.test(out.kaiki) && /日/.test(out.kaiki);
+      const filledCount = Object.values(out).filter(v => (v || '').trim().length > 0).length;
+      if(!okKaiki || filledCount < 3){
+        return {ok:false, out, debug:{reason:'validation_failed', candidates}};
+      }
+      return {ok:true, out, debug:{reason:'form_fields', candidates, picked:{title:picked.title?.fieldName, kaiki:picked.kaiki?.fieldName, venue:picked.venue?.fieldName, honbun:picked.honbun?.fieldName}}};
+    }
+
+    function buildLinesFromTextItems(items){
+      // items: [{str, x, y, w, h}]
+      const filtered = items.filter(it => it.str && it.str.trim().length);
+      // Group by y (quantized)
+      const buckets = new Map();
+      for(const it of filtered){
+        const yKey = Math.round(it.y * 2) / 2; // 0.5pt granularity
+        if(!buckets.has(yKey)) buckets.set(yKey, []);
+        buckets.get(yKey).push(it);
+      }
+      // Sort lines by y desc
+      const yKeys = Array.from(buckets.keys()).sort((a,b)=>b-a);
+      const lines = [];
+      for(const y of yKeys){
+        const row = buckets.get(y).slice().sort((a,b)=>a.x-b.x);
+        let line = '';
+        let prevEnd = null;
+        for(const it of row){
+          if(prevEnd != null){
+            const gap = it.x - prevEnd;
+            if(gap > 2 && !line.endsWith(' ') && !it.str.startsWith(' ')){
+              line += ' ';
+            }
+          }
+          line += it.str;
+          prevEnd = it.x + (it.w ?? 0);
+        }
+        lines.push(line.replace(/\s+$/,''));
+      }
+      return lines;
+    }
+
+    function extractByAnchorsFromLines(lines){
+      const idx = {
+        title: -1,
+        kaiki: -1,
+        venue: -1,
+        honbun: -1
+      };
+      const reTitle = /【\s*タイトル\s*】/;
+      const reKaiki = /【\s*会期\s*】/;
+      const reVenue = /【\s*会場\s*】/;
+      const reHonbun = /【\s*本文\s*】/;
+
+      for(let i=0;i<lines.length;i++){
+        const t = lines[i];
+        if(idx.title<0 && reTitle.test(t)) idx.title = i;
+        if(idx.kaiki<0 && reKaiki.test(t)) idx.kaiki = i;
+        if(idx.venue<0 && reVenue.test(t)) idx.venue = i;
+        if(idx.honbun<0 && reHonbun.test(t)) idx.honbun = i;
+      }
+      if(idx.title<0 || idx.kaiki<0 || idx.venue<0 || idx.honbun<0){
+        return {ok:false, out:{title:'',kaiki:'',venue:'',honbun:''}, debug:{reason:'anchors_missing', idx, sample:lines.slice(0,120)}};
+      }
+
+      function block(start, end){
+        const a = lines[start] || '';
+        // take same-line content after the first "】"
+        let first = a.replace(/.*?】/, '');
+        if(first.startsWith('　') || first.startsWith(' ')) first = first.replace(/^[\s　]+/, '');
+        const arr = [];
+        if(first.trim().length) arr.push(first);
+        for(let i=start+1;i<end;i++){
+          arr.push(lines[i]);
+        }
+        // Trim leading/trailing empty lines
+        while(arr.length && arr[0].trim()==='') arr.shift();
+        while(arr.length && arr[arr.length-1].trim()==='') arr.pop();
+        return arr.join('\n');
+      }
+
+      const out = {
+        title: block(idx.title, idx.kaiki),
+        kaiki: block(idx.kaiki, idx.venue),
+        venue: block(idx.venue, idx.honbun),
+        honbun: block(idx.honbun, lines.length),
+      };
+
+      const ok = out.title.trim().length>0 && out.kaiki.trim().length>0 && out.venue.trim().length>0 && out.honbun.trim().length>0;
+      return {ok, out, debug:{reason:'anchors', idx, sample:lines.slice(Math.max(0, idx.title-3), Math.min(lines.length, idx.honbun+40))}};
+    }
+
+    async function extractFromPdf(file){
+      await ensurePdfJs();
+
+      const buf = await file.arrayBuffer();
+      const loadingTask = pdfjsLib.getDocument({ disableWorker: true, data: buf});
+      const pdf = await loadingTask.promise;
+
+      const debug = {numPages: pdf.numPages};
+
+      // --- Try form fields first (best fidelity) ---
+      let allFields = [];
+      for(let p=1; p<=Math.min(pdf.numPages, 3); p++){
+        const page = await pdf.getPage(p);
+        const annots = await page.getAnnotations({intent:'display'});
+        const fields = getTextFieldsFromAnnotations(annots);
+        if(fields.length){
+          allFields = allFields.concat(fields.map(f => ({...f, page:p})));
+        }
+      }
+      debug.formFieldCount = allFields.length;
+
+      if(allFields.length){
+        const r = classifyFromFormFields(allFields);
+        debug.form = r.debug;
+        if(r.ok){
+          return {ok:true, out:r.out, debug};
+        }
+      }
+
+      // --- Fallback: text layer + anchors ---
+      let allLines = [];
+      for(let p=1; p<=Math.min(pdf.numPages, 3); p++){
+        const page = await pdf.getPage(p);
+        const tc = await page.getTextContent({disableCombineTextItems:false});
+        const items = (tc.items || []).map(it => ({
+          str: it.str || '',
+          x: (it.transform && it.transform[4]) ? it.transform[4] : 0,
+          y: (it.transform && it.transform[5]) ? it.transform[5] : 0,
+          w: it.width || 0,
+          h: it.height || 0
+        }));
+        const lines = buildLinesFromTextItems(items);
+        allLines = allLines.concat(lines);
+      }
+      debug.textLinesSample = allLines.slice(0, 80);
+
+      const r2 = extractByAnchorsFromLines(allLines);
+      debug.anchor = r2.debug;
+
+      if(r2.ok){
+        return {ok:true, out:r2.out, debug};
+      }
+      return {ok:false, out:r2.out, debug};
+    }
+
+    // ========= UI wiring =========
+    async function handleFile(file){
+      if(!file) return;
+      if(file.type !== 'application/pdf' && !file.name.toLowerCase().endsWith('.pdf')){
+        setStatus('PDFファイルを選択してください。');
+        return;
+      }
+      setStatus('PDFを解析中…（OCRは使いません）');
+      setDebug('');
+      try{
+        backupNow();
+        const result = await extractFromPdf(file);
+        setDebug(result.debug);
+
+        if(!result.ok){
+          setStatus('抽出に失敗しました。PDFの形式が想定と異なる可能性があります。診断を開いて確認してください。');
+          // do not overwrite inputs if failed
+          return;
+        }
+
+        // Write into INPUT fields only (non-breaking to CMS extension)
+        writeInputs({
+          title: result.out.title,
+          kaiki: result.out.kaiki,
+          venue: result.out.venue,
+          honbun: result.out.honbun
+        });
+
+        setStatus('抽出完了：入力欄に反映しました。必要なら「変換」を押してください。');
+      }catch(err){
+        setStatus('エラー：' + (err && err.message ? err.message : String(err)));
+        setDebug({error:String(err), stack: err && err.stack ? String(err.stack) : ''});
+      }finally{
+        // reset file input (allow re-select same file)
+        try{ elFile.value = ''; }catch(e){}
+      }
+    }
+
+    elFile.addEventListener('change', (e)=>{
+      const f = e.target.files && e.target.files[0];
+      handleFile(f);
+    });
+
+    elDrop.addEventListener('dragover', (e)=>{
+      e.preventDefault();
+      e.dataTransfer.dropEffect = 'copy';
+      elDrop.classList.add('dragover');
+    });
+    elDrop.addEventListener('dragleave', ()=>{
+      elDrop.classList.remove('dragover');
+    });
+    elDrop.addEventListener('drop', (e)=>{
+      e.preventDefault();
+      elDrop.classList.remove('dragover');
+      const f = e.dataTransfer.files && e.dataTransfer.files[0];
+      handleFile(f);
+    });
+
+    elUndo.addEventListener('click', ()=>{
+      if(!lastBackup) return;
+      writeInputs(lastBackup);
+      setStatus('元に戻しました。');
+    });
+
+    elClear.addEventListener('click', ()=>{
+      clearInputs();
+    });
+
+  })();
+  </script>
+
 </body>
 </html>
