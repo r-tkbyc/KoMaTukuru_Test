@@ -145,65 +145,40 @@
     border-radius: 8px;
     padding: 10px 12px;
   }
-  #pdfImportPanel .pdf-head{
-    display:flex;
-    align-items:center;
-    justify-content:space-between;
-    gap: 10px;
-    margin-bottom: 8px;
-  }
-  #pdfImportPanel .pdf-title{
-    font-size: 13px;
-    font-weight: 700;
-    letter-spacing: .02em;
-  }
-  #pdfImportPanel .pdf-actions{
-    display:flex;
-    align-items:center;
-    gap: 8px;
-    flex-wrap: wrap;
-  }
+  
+  /* PDF取り込み（エントリーシート）: 既存デザインに合わせる（textarea相当） */
   #pdfDropZone{
-    border: 1px dashed #334155;
-    background: #0b1220;
-    border-radius: 8px;
-    padding: 12px;
-    text-align:center;
-    color: #cbd5e1;
+    border: 1px solid #22303e;
+    background: #0b121a;
+    border-radius: 6px; /* textarea と統一 */
+    padding: 10px;
+    min-height: 60px; /* textarea と統一 */
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    color: #e6edf3;
+    line-height: 1.45;
+    font-size: 13px;
     user-select: none;
   }
   #pdfDropZone.dragover{
-    outline: 2px solid #2a81fb;
-    outline-offset: 2px;
+    outline: 1px solid #2a81fb;
+    outline-offset: 0;
+    box-shadow: 0 0 0 1px #2a81fb inset;
   }
-  .pdf-btn{
-    height: var(--btn-h);
-    padding: 0 10px;
-    border-radius: 4px;
-    border: 1px solid #334155;
-    background: #111827;
-    color: #e6edf3;
-    font-size: 12px;
-    cursor: pointer;
-    display:inline-flex;
-    align-items:center;
-    justify-content:center;
-    line-height: calc(var(--btn-h) - 2px);
-    white-space: nowrap;
-  }
-  .pdf-btn[disabled]{
-    opacity: .5;
-    cursor: default;
-  }
-  #pdfStatus{
+
+#pdfStatus{
     margin-top: 8px;
     font-size: 12px;
     color: #cbd5e1;
     min-height: 16px;
     white-space: pre-wrap;
   }
+  /* 抽出ログは通常非表示（診断モード時のみJSで表示） */
   #pdfDebug{
     margin-top: 8px;
+    display: none;
   }
   #pdfDebug summary{
     cursor: pointer;
@@ -213,14 +188,15 @@
   #pdfDebugPre{
     margin-top: 8px;
     padding: 10px;
-    border-radius: 8px;
-    background:#0b1220;
-    border: 1px solid #1f2937;
+    border-radius: 6px;
+    background:#0b121a;
+    border: 1px solid #22303e;
     overflow:auto;
     max-height: 220px;
     font-size: 11px;
     color:#cbd5e1;
   }
+
 
 </style>
 </head>
@@ -233,26 +209,28 @@
   <main>
 
     <!-- PDF取り込み（エントリーシート） -->
-    <section id="pdfImportPanel" aria-label="PDF取り込み">
-      <div class="pdf-head">
-        <div class="pdf-title">PDF取り込み（エントリーシート）</div>
-        <div class="pdf-actions">
-          <label class="pdf-btn" for="pdfFile">PDFを選択</label>
+    <section id="pdfImportPanel" class="set" aria-label="PDF取り込み">
+      <div class="set-head">
+        <h2 class="set-title">PDF取り込み（エントリーシート）</h2>
+        <div class="actions">
+          <button type="button" id="pdfPickBtn" class="btn-compact">PDFを選択</button>
           <input id="pdfFile" type="file" accept="application/pdf" style="display:none">
-          <button type="button" id="pdfUndo" class="pdf-btn" disabled>元に戻す</button>
-          <button type="button" id="pdfClearInputs" class="pdf-btn">入力欄クリア</button>
         </div>
       </div>
-      <div id="pdfDropZone">ここにPDFをドロップ（または「PDFを選択」）</div>
-      <div id="pdfStatus"></div>
-      <details id="pdfDebug">
-        <summary>診断（抽出ログ）</summary>
-        <pre id="pdfDebugPre"></pre>
-      </details>
+
+      <div class="panel">
+        <div id="pdfDropZone">ここにPDFをドロップ（または「PDFを選択」）</div>
+        <div id="pdfStatus"></div>
+
+        <!-- 診断ログ（通常は非表示。キーボード操作/ローカル設定で表示） -->
+        <details id="pdfDebug">
+          <summary>診断（抽出ログ）</summary>
+          <pre id="pdfDebugPre"></pre>
+        </details>
+      </div>
     </section>
 
-
-    <!-- タイトル セット -->
+<!-- タイトル セット -->
     <section class="set" data-set="title">
       <div class="set-head">
         <h2 class="set-title">タイトル</h2>
@@ -1066,23 +1044,50 @@
     'use strict';
 
     // ========= Config =========
-    const DEBUG_DEFAULT_OPEN = false; // set true if you want <details> open by default
+    // 抽出ログ（診断）は通常非表示です。
+    // 表示したい場合：
+    //   1) Ctrl + Alt + Shift + D で切替（このブラウザに保存）
+    //   2) URL に ?kmt_debug=1 を付けて開く
+    const DEBUG_KEY = 'KMT_PDF_DEBUG';
+    const DEBUG_MODE_FROM_URL = (new URLSearchParams(location.search).get('kmt_debug') === '1');
+    let debugMode = DEBUG_MODE_FROM_URL;
+    try{ debugMode = debugMode || (localStorage.getItem(DEBUG_KEY) === '1'); }catch(_e){ /* storage blocked */ }
+
 
     // ========= Elements =========
+    const elPickBtn = document.getElementById('pdfPickBtn');
     const elFile = document.getElementById('pdfFile');
     const elDrop = document.getElementById('pdfDropZone');
     const elStatus = document.getElementById('pdfStatus');
-    const elUndo = document.getElementById('pdfUndo');
-    const elClear = document.getElementById('pdfClearInputs');
     const elDebug = document.getElementById('pdfDebug');
     const elDebugPre = document.getElementById('pdfDebugPre');
 
-    if(!elFile || !elDrop || !elStatus || !elUndo || !elClear || !elDebug || !elDebugPre){
+    if(!elFile || !elDrop || !elStatus || !elDebug || !elDebugPre){
       // If the page structure changes, fail silently (do not break existing features)
       return;
     }
 
-    elDebug.open = !!DEBUG_DEFAULT_OPEN;
+    function applyDebugVisibility(){
+      elDebug.style.display = debugMode ? 'block' : 'none';
+      if(!debugMode){
+        elDebug.open = false;
+      }
+    }
+    applyDebugVisibility();
+
+    // Hidden toggle for diagnostics (only for the person who knows the shortcut)
+    document.addEventListener('keydown', (e)=>{
+      if(e.ctrlKey && e.altKey && e.shiftKey && (e.code === 'KeyD' || e.key === 'D' || e.key === 'd')){
+        debugMode = !debugMode;
+        try{ localStorage.setItem(DEBUG_KEY, debugMode ? '1' : '0'); }catch(_e){}
+        applyDebugVisibility();
+        setStatus(debugMode ? '診断モード ON（抽出ログを表示）' : '診断モード OFF（抽出ログを非表示）');
+      }
+    });
+
+    if(elPickBtn){
+      elPickBtn.addEventListener('click', ()=> elFile.click());
+    }
 
     // ========= Helpers =========
     function setStatus(msg){
@@ -1098,7 +1103,8 @@
     }
 
     function normalizeCRLF(s){
-      return (s ?? '').toString().replace(/\r\n?/g, '\n');
+      // Normalize line endings without altering content (NO OCR)
+      return (s ?? '').toString().replace(/\r\n/g, '\n').replace(/\r/g, '\n');
     }
 
     function fireInput(el){
@@ -1110,15 +1116,6 @@
 
     function qsInput(setName){
       return document.querySelector('[data-set="'+setName+'"] textarea.input');
-    }
-
-    function readCurrentInputs(){
-      return {
-        title: (qsInput('title')?.value ?? ''),
-        kaiki: (qsInput('kaiki')?.value ?? ''),
-        venue: (qsInput('venue')?.value ?? ''),
-        honbun: (qsInput('honbun')?.value ?? ''),
-      };
     }
 
     function writeInputs(values){
@@ -1134,18 +1131,6 @@
         el.value = values[k] ?? '';
         fireInput(el);
       }
-    }
-
-    let lastBackup = null;
-    function backupNow(){
-      lastBackup = readCurrentInputs();
-      elUndo.disabled = false;
-    }
-
-    function clearInputs(){
-      backupNow();
-      writeInputs({title:'', kaiki:'', venue:'', honbun:''});
-      setStatus('入力欄をクリアしました。');
     }
 
     // ========= PDF parsing =========
@@ -1471,7 +1456,6 @@
       setStatus('PDFを解析中…（OCRは使いません）');
       setDebug('');
       try{
-        backupNow();
         const result = await extractFromPdf(file);
         setDebug(result.debug);
 
@@ -1519,17 +1503,8 @@
       handleFile(f);
     });
 
-    elUndo.addEventListener('click', ()=>{
-      if(!lastBackup) return;
-      writeInputs(lastBackup);
-      setStatus('元に戻しました。');
-    });
-
-    elClear.addEventListener('click', ()=>{
-      clearInputs();
-    });
-
-  })();
+        
+})();
   </script>
 
 </body>
