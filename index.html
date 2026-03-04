@@ -1544,119 +1544,33 @@
     }
 
     function scoreFeatures(val){
-      const s = String(val || '');
+      const s = val || '';
       const len = s.length;
       const lines = s.split('\n').length;
       const startsBullet = /^\s*■/.test(s);
-
-      const half = (typeof toHalfDigits === 'function') ? toHalfDigits(s) : s;
-      const hasDate =
-        /[0-9０-９]{1,2}月[0-9０-９]{1,2}日/.test(s) ||
-        /\b\d{1,2}\/\d{1,2}\b/.test(half);
-
+      const hasDate = /[0-9０-９]{1,2}月[0-9０-９]{1,2}日/.test(s) || /\b\d{1,2}\/\d{1,2}\b/.test(s);
       const hasRange = /[〜～]/.test(s) || /[\-－—]/.test(s);
       const hasFloor = /[0-9０-９]+階|\b[0-9０-９]+F\b|地下|B[0-9０-９]/i.test(s);
       const hasStopTime = /閉場|午後|午前|\d{1,2}[:：]\d{2}/.test(s);
-
-      const hasImageExt = /\.(jpe?g|png|gif|webp|pdf)\b/i.test(s);
-      const circledCount = (s.match(/[①②③④⑤⑥⑦⑧⑨⑩⑪⑫⑬⑭⑮⑯⑰⑱⑲⑳]/g) || []).length;
-      const hasCircledSeq = circledCount >= 2;
-      const hasImageList = hasImageExt || hasCircledSeq || /TOP\.(jpe?g|png)/i.test(s);
-
-      const hasMeta =
-        /カテゴリー|綴じ|画像|メール|バナー|hp\d|ｈｐ\d/i.test(s) ||
-        hasImageList;
-
+      const hasMeta = /カテゴリー|綴じ|画像|メール|バナー|hp\d|ｈｐ\d/i.test(s);
       const punctuationCount = (s.match(/。/g) || []).length;
-
-      return {
-        len, lines, startsBullet, hasDate, hasRange, hasFloor, hasStopTime,
-        hasImageExt, circledCount, hasImageList,
-        hasMeta, punctuationCount
-      };
+      return {len, lines, startsBullet, hasDate, hasRange, hasFloor, hasStopTime, hasMeta, punctuationCount};
     }
 
     function classifyFromFormFields(fields){
-      // fields: [{value, fieldName, rect, page}]
-      const debug = {reason:'form_fields', strategy:[], byName:{}, picked:{}, candidates:[]};
-
-      function normKey(name){
-        const n = String(name || '').trim();
-        const m = n.match(/Text\d+/i);
-        return m ? m[0] : n;
-      }
-
-      function isLikelyImageList(val){
-        const s = String(val || '').trim();
-        if(!s) return false;
-        const ext = /\.(jpe?g|png|gif|webp|pdf)\b/i.test(s);
-        const circled = (s.match(/[①②③④⑤⑥⑦⑧⑨⑩⑪⑫⑬⑭⑮⑯⑰⑱⑲⑳]/g) || []).length;
-        const top = /TOP\.(jpe?g|png)/i.test(s);
-        return ext || top || circled >= 2;
-      }
-
-      function pickLongest(map, key){
-        const arr = map.get(key);
-        if(!arr || !arr.length) return '';
-        let best = '';
-        for(const v of arr){
-          const t = String(v || '');
-          if(t.trim().length && t.trim().length > best.trim().length) best = t;
-        }
-        return best;
-      }
-
-      // --- 1) Prefer stable field names for this template ---
-      const byKey = new Map();
-      for(const f of fields || []){
-        const k = normKey(f.fieldName);
-        if(!k) continue;
-        if(!byKey.has(k)) byKey.set(k, []);
-        byKey.get(k).push(f.value);
-      }
-
-      const out = {title:'', kaiki:'', venue:'', honbun:''};
-
-      const t6 = pickLongest(byKey, 'Text6');
-      const t7 = pickLongest(byKey, 'Text7');
-      const t8 = pickLongest(byKey, 'Text8');
-      const t9 = pickLongest(byKey, 'Text9');
-
-      if(t6) out.title = t6;
-      if(t7) out.kaiki = t7;
-      if(t8) out.venue = t8;
-      if(t9) out.honbun = t9;
-
-      debug.byName = {
-        Text6: t6 ? t6.slice(0,160) : '',
-        Text7: t7 ? t7.slice(0,160) : '',
-        Text8: t8 ? t8.slice(0,160) : '',
-        Text9: t9 ? t9.slice(0,160) : ''
-      };
-
-      if(out.title && isLikelyImageList(out.title)){
-        debug.strategy.push('reject title(Text6): looks_like_image_list');
-        out.title = '';
-      }
-      if(out.honbun && isLikelyImageList(out.honbun)){
-        debug.strategy.push('reject honbun(Text9): looks_like_image_list');
-        out.honbun = '';
-      }
-
-      // --- 2) Fill missing by scoring (avoid image-list for title/body) ---
-      const candidates = (fields || []).map(f => {
-        const value = String(f.value || '');
+      // fields: [{value, fieldName}]
+      const candidates = fields.map(f => {
+        const value = (f.value || '').toString();
         const feat = scoreFeatures(value);
-        const base = {fieldName: f.fieldName || '', value, feat};
-
+        const base = {fieldName: f.fieldName, value, feat};
+        // Scoring per category
         const scoreKaiki =
           (feat.hasDate ? 5 : 0) +
           (feat.hasRange ? 3 : 0) +
           (feat.startsBullet ? 2 : 0) +
           (!feat.hasMeta ? 1 : -4) +
-          (feat.len <= 180 ? 1 : -4) +
-          (feat.hasFloor ? -2 : 0) +
-          (feat.hasImageList ? -8 : 0);
+          (feat.len <= 140 ? 1 : -4) +
+          (feat.hasFloor ? -2 : 0);
 
         const scoreVenue =
           (feat.startsBullet ? 3 : 0) +
@@ -1664,83 +1578,55 @@
           (feat.hasStopTime ? 2 : 0) +
           (!feat.hasMeta ? 1 : -4) +
           (feat.hasDate && feat.hasRange ? -4 : 0) +
-          (feat.len <= 260 ? 1 : -3) +
-          (feat.hasImageList ? -8 : 0);
+          (feat.len <= 220 ? 1 : -3);
 
         const scoreTitle =
           ((feat.len >= 2 && feat.len <= 90) ? 5 : (feat.len <= 140 ? 1 : -4)) +
           (feat.lines === 1 ? 2 : -1) +
           (!feat.startsBullet ? 1 : -4) +
           (!feat.hasDate ? 1 : -4) +
-          (!feat.hasMeta ? 1 : -4) +
-          (feat.hasImageList ? -10 : 0);
+          (!feat.hasMeta ? 1 : -4);
 
         const scoreBody =
           (feat.len >= 120 ? 6 : (feat.len >= 60 ? 2 : -4)) +
           (feat.lines >= 3 ? 2 : 0) +
           (feat.punctuationCount >= 2 ? 1 : 0) +
-          (!feat.hasMeta ? 2 : -4) +
-          (feat.hasImageList ? -10 : 0);
+          (!feat.hasMeta ? 2 : -4);
 
         return {...base, scoreKaiki, scoreVenue, scoreTitle, scoreBody};
       });
 
-      debug.candidates = candidates.map(c => ({
-        fieldName: c.fieldName,
-        len: c.feat.len,
-        lines: c.feat.lines,
-        hasDate: c.feat.hasDate,
-        hasFloor: c.feat.hasFloor,
-        hasImageList: c.feat.hasImageList,
-        scoreTitle: c.scoreTitle,
-        scoreKaiki: c.scoreKaiki,
-        scoreVenue: c.scoreVenue,
-        scoreBody: c.scoreBody,
-        preview: String(c.value || '').slice(0, 60)
-      }));
-
-      // mark used by fieldName key if already taken by name mapping
-      const usedKeys = new Set();
-      if(t6) usedKeys.add(normKey('Text6'));
-      if(t7) usedKeys.add(normKey('Text7'));
-      if(t8) usedKeys.add(normKey('Text8'));
-      if(t9) usedKeys.add(normKey('Text9'));
-
-      function pickBest(key, forbidImageList){
+      function pickBest(key, usedSet){
         const sorted = candidates
-          .filter(c => {
-            const k = normKey(c.fieldName);
-            if(usedKeys.has(k)) return false;
-            if(forbidImageList && c.feat.hasImageList) return false;
-            return true;
-          })
+          .filter(c => !usedSet.has(c))
           .slice()
           .sort((a,b)=> (b[key]-a[key]) || (b.feat.len-a.feat.len));
         return sorted[0] || null;
       }
 
-      if(!out.kaiki){
-        const b = pickBest('scoreKaiki', false);
-        if(b){ out.kaiki = b.value; debug.strategy.push('fill kaiki by scoring'); debug.picked.kaiki = b.fieldName; usedKeys.add(normKey(b.fieldName)); }
-      }
-      if(!out.venue){
-        const b = pickBest('scoreVenue', false);
-        if(b){ out.venue = b.value; debug.strategy.push('fill venue by scoring'); debug.picked.venue = b.fieldName; usedKeys.add(normKey(b.fieldName)); }
-      }
-      if(!out.honbun){
-        const b = pickBest('scoreBody', true);
-        if(b){ out.honbun = b.value; debug.strategy.push('fill honbun by scoring'); debug.picked.honbun = b.fieldName; usedKeys.add(normKey(b.fieldName)); }
-      }
-      if(!out.title){
-        const b = pickBest('scoreTitle', true);
-        if(b){ out.title = b.value; debug.strategy.push('fill title by scoring'); debug.picked.title = b.fieldName; usedKeys.add(normKey(b.fieldName)); }
-      }
+      const used = new Set();
+      const picked = {title:null, kaiki:null, venue:null, honbun:null};
 
-      // Relaxed validation: for writing inputs, we only require honbun + at least one of others.
-      const filledCount = Object.values(out).filter(v => String(v||'').trim().length > 0).length;
-      const ok = String(out.honbun||'').trim().length > 0 && filledCount >= 2;
+      // pick distinctive ones first
+      picked.kaiki = pickBest('scoreKaiki', used); if(picked.kaiki) used.add(picked.kaiki);
+      picked.venue = pickBest('scoreVenue', used); if(picked.venue) used.add(picked.venue);
+      picked.honbun = pickBest('scoreBody', used);  if(picked.honbun) used.add(picked.honbun);
+      picked.title = pickBest('scoreTitle', used);  if(picked.title) used.add(picked.title);
 
-      return {ok, out, debug};
+      const out = {
+        title: picked.title?.value || '',
+        kaiki: picked.kaiki?.value || '',
+        venue: picked.venue?.value || '',
+        honbun: picked.honbun?.value || '',
+      };
+
+      // Basic validation: must have at least 3/4, and kaiki must look like date range
+      const okKaiki = /月/.test(out.kaiki) && /日/.test(out.kaiki);
+      const filledCount = Object.values(out).filter(v => (v || '').trim().length > 0).length;
+      if(!okKaiki || filledCount < 3){
+        return {ok:false, out, debug:{reason:'validation_failed', candidates}};
+      }
+      return {ok:true, out, debug:{reason:'form_fields', candidates, picked:{title:picked.title?.fieldName, kaiki:picked.kaiki?.fieldName, venue:picked.venue?.fieldName, honbun:picked.honbun?.fieldName}}};
     }
 
     function buildLinesFromTextItems(items){
@@ -1825,7 +1711,7 @@
       return {ok, out, debug:{reason:'anchors', idx, sample:lines.slice(Math.max(0, idx.title-3), Math.min(lines.length, idx.honbun+40))}};
     }
 
-    async async function extractFromPdf(file){
+    async function extractFromPdf(file){
       await ensurePdfJs();
 
       const buf = await file.arrayBuffer();
@@ -1846,50 +1732,12 @@
       }
       debug.formFieldCount = allFields.length;
 
-      let out = {title:'', kaiki:'', venue:'', honbun:''};
-      let usedForm = false;
-
       if(allFields.length){
         const r = classifyFromFormFields(allFields);
         debug.form = r.debug;
-        out = r.out;
-        usedForm = Object.values(out).some(v => String(v||'').trim().length > 0);
-
-        // If we got something from form fields, fill ONLY missing parts by anchors (never overwrite filled form values).
-        if(usedForm){
-          const needKeys = Object.keys(out).filter(k => !String(out[k]||'').trim().length);
-          if(needKeys.length){
-            let allLines = [];
-            for(let p=1; p<=Math.min(pdf.numPages, 3); p++){
-              const page = await pdf.getPage(p);
-              const tc = await page.getTextContent({disableCombineTextItems:false});
-              const items = (tc.items || []).map(it => ({
-                str: it.str || '',
-                x: (it.transform && it.transform[4]) ? it.transform[4] : 0,
-                y: (it.transform && it.transform[5]) ? it.transform[5] : 0,
-                w: it.width || 0,
-                h: it.height || 0
-              }));
-              const lines = buildLinesFromTextItems(items);
-              allLines = allLines.concat(lines);
-            }
-            debug.textLinesSample = allLines.slice(0, 80);
-
-            const r2 = extractByAnchorsFromLines(allLines);
-            debug.anchor = r2.debug;
-
-            for(const k of needKeys){
-              const v = r2.out && r2.out[k] ? String(r2.out[k]) : '';
-              if(v.trim().length) out[k] = v;
-            }
-          }
+        if(r.ok){
+          return {ok:true, out:r.out, debug};
         }
-      }
-
-      if(usedForm){
-        const filledCount = Object.values(out).filter(v => String(v||'').trim().length > 0).length;
-        const ok = String(out.honbun||'').trim().length > 0 && filledCount >= 2;
-        return {ok, out, debug};
       }
 
       // --- Fallback: text layer + anchors ---
@@ -1915,7 +1763,6 @@
       if(r2.ok){
         return {ok:true, out:r2.out, debug};
       }
-      // even if anchors are incomplete, return what we have (do not write inputs unless ok in UI handler)
       return {ok:false, out:r2.out, debug};
     }
 
