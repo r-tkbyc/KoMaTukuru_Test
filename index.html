@@ -4,8 +4,8 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
 
-  <!-- Text Formatter v2.0.1 - 2026-02-06 -->
-  <meta name="app-version" content="v2.0.1">
+  <!-- Text Formatter v2.1.3 - 2026-03-04 -->
+  <meta name="app-version" content="v2.1.3">
 
   <title>KoMaTukuru テキスト整形ツール</title>
   <style>
@@ -137,20 +137,21 @@
     accent-color: #2a81fb;
   }
   
-  /* ===== PDF Import (EntrySheet) ===== */
+  /* ===== PDF Import (non-breaking) ===== */
+  /* PDF取り込み（エントリーシート）: 既存デザインに合わせる（textarea相当） */
   #pdfDropZone{
     border: 1px solid #3b3b3b;
     background: #2a2a2a;
-    border-radius: 2px;
-    padding: 8px;
-    min-height: 60px;
+    border-radius: 2px; /* textarea と統一 */
+    padding: 10px;
+    min-height: 60px; /* textarea と統一 */
     display: flex;
     align-items: center;
     justify-content: center;
     text-align: center;
-    color: #e3e3e3;
-    line-height: 1.3;
-    font-size: 11px;
+    color: #e6edf3;
+    line-height: 1.45;
+    font-size: 13px;
     user-select: none;
   }
   #pdfDropZone.dragover{
@@ -158,22 +159,42 @@
     outline-offset: 0;
     box-shadow: 0 0 0 1px #2a81fb inset;
   }
-  #pdfStatus{ margin-top: 6px; font-size: 11px; color: #bfbfbf; }
-  #pdfDebug{ margin-top: 6px; }
-  #pdfDebug summary{ cursor: pointer; font-size: 11px; color: #bfbfbf; }
-  #pdfDebugPre{
-    margin: 6px 0 0;
-    white-space: pre-wrap;
-    word-break: break-word;
-    background: #2a2a2a;
-    border: 1px solid #3b3b3b;
-    border-radius: 2px;
-    padding: 8px;
-    font-size: 11px;
-    color: #e3e3e3;
-    max-height: 260px;
-    overflow: auto;
+#pdfDropZone.paste-armed{
+    outline: 1px solid #2a81fb;
+    outline-offset: 0;
+    box-shadow: 0 0 0 1px #2a81fb inset;
   }
+
+#pdfStatus{
+    margin-top: 8px;
+    font-size: 12px;
+    color: #cbd5e1;
+    min-height: 16px;
+    white-space: pre-wrap;
+  }
+  /* 抽出ログは通常非表示（診断モード時のみJSで表示） */
+  #pdfDebug{
+    margin-top: 8px;
+    display: none;
+  }
+  #pdfDebug summary{
+    cursor: pointer;
+    color: #93c5fd;
+    font-size: 12px;
+  }
+  #pdfDebugPre{
+    margin-top: 8px;
+    padding: 10px;
+    border-radius: 6px;
+    background:#0b121a;
+    border: 1px solid #22303e;
+    overflow:auto;
+    max-height: 220px;
+    font-size: 11px;
+    color:#cbd5e1;
+  }
+
+
 </style>
 </head>
 
@@ -183,30 +204,30 @@
     <button id="ver" class="ver-badge"></button>
   </header>
   <main>
+
     <!-- PDF取り込み（エントリーシート） -->
     <section id="pdfImportPanel" class="set" aria-label="PDF取り込み">
-          <div class="set-head">
-            <h2 class="set-title">PDF取り込み（エントリーシート）</h2>
-            <div class="actions">
-              <button type="button" id="pdfPickBtn" class="btn-compact">PDFを選択</button>
-              <input id="pdfFile" type="file" accept="application/pdf" style="display:none">
-            </div>
-          </div>
-    
-          <div class="panel">
-            <div id="pdfDropZone">ここにPDFをドロップ（または「PDFを選択」）</div>
-            <div id="pdfStatus"></div>
-    
-            <!-- 診断ログ（通常は非表示。キーボード操作/ローカル設定で表示） -->
-            <details id="pdfDebug">
-              <summary>診断（抽出ログ）</summary>
-              <pre id="pdfDebugPre"></pre>
-            </details>
-          </div>
-        </section>
+      <div class="set-head">
+        <h2 class="set-title">PDF取り込み（エントリーシート）</h2>
+        <div class="actions">
+          <button type="button" id="pdfPickBtn" class="btn-compact">PDFを選択</button>
+          <input id="pdfFile" type="file" accept="application/pdf" style="display:none">
+        </div>
+      </div>
 
+      <div class="panel">
+        <div id="pdfDropZone">ここにPDFをドロップ（または「PDFを選択」）</div>
+        <div id="pdfStatus"></div>
 
-    <!-- タイトル セット -->
+        <!-- 診断ログ（通常は非表示。キーボード操作/ローカル設定で表示） -->
+        <details id="pdfDebug">
+          <summary>診断（抽出ログ）</summary>
+          <pre id="pdfDebugPre"></pre>
+        </details>
+      </div>
+    </section>
+
+<!-- タイトル セット -->
     <section class="set" data-set="title">
       <div class="set-head">
         <h2 class="set-title">タイトル</h2>
@@ -331,8 +352,8 @@
   <div class="toast" id="toast"></div>
 
   <script>
-  const APP_VERSION = "v2.0.1";
-  const APP_BUILD = "2026-02-06";
+  const APP_VERSION = "v2.1.2";
+  const APP_BUILD = "2026-03-04";
 
   // 価格直前の全角スペース付与を将来再有効化できるように保持
   const PRICE_SPACE_RULE_ENABLED = false;
@@ -1014,561 +1035,950 @@
   })();
   </script>
 
-
   <!-- PDF.js loader (NO OCR) - tries local first, then multiple CDNs -->
-  <script>
-    (function(){
-      'use strict';
-  
-      // ========= Config =========
-      // 抽出ログ（診断）は通常非表示です。
-      // 表示したい場合：
-      //   1) Ctrl + Alt + Shift + D で切替（このブラウザに保存）
-      //   2) URL に ?kmt_debug=1 を付けて開く
-      const DEBUG_KEY = 'KMT_PDF_DEBUG';
-      const DEBUG_MODE_FROM_URL = (new URLSearchParams(location.search).get('kmt_debug') === '1');
-      let debugMode = DEBUG_MODE_FROM_URL;
-      try{ debugMode = debugMode || (localStorage.getItem(DEBUG_KEY) === '1'); }catch(_e){ /* storage blocked */ }
-  
-  
-      // ========= Elements =========
-      const elPickBtn = document.getElementById('pdfPickBtn');
-      const elFile = document.getElementById('pdfFile');
-      const elDrop = document.getElementById('pdfDropZone');
-      const elStatus = document.getElementById('pdfStatus');
-      const elDebug = document.getElementById('pdfDebug');
-      const elDebugPre = document.getElementById('pdfDebugPre');
-  
-      if(!elFile || !elDrop || !elStatus || !elDebug || !elDebugPre){
-        // If the page structure changes, fail silently (do not break existing features)
+<script>
+  (function(){
+    'use strict';
+
+    // ========= Config =========
+    // 抽出ログ（診断）は通常非表示です。
+    // 表示したい場合：
+    //   1) Ctrl + Alt + Shift + D で切替（このブラウザに保存）
+    //   2) URL に ?kmt_debug=1 を付けて開く
+    const DEBUG_KEY = 'KMT_PDF_DEBUG';
+    const DEBUG_MODE_FROM_URL = (new URLSearchParams(location.search).get('kmt_debug') === '1');
+    let debugMode = DEBUG_MODE_FROM_URL;
+    try{ debugMode = debugMode || (localStorage.getItem(DEBUG_KEY) === '1'); }catch(_e){ /* storage blocked */ }
+
+
+    // ========= Elements =========
+    const elPickBtn = document.getElementById('pdfPickBtn');
+    const elFile = document.getElementById('pdfFile');
+    const elDrop = document.getElementById('pdfDropZone');
+    const elStatus = document.getElementById('pdfStatus');
+    const elDebug = document.getElementById('pdfDebug');
+    const elDebugPre = document.getElementById('pdfDebugPre');
+
+    if(!elFile || !elDrop || !elStatus || !elDebug || !elDebugPre){
+      // If the page structure changes, fail silently (do not break existing features)
+      return;
+    }
+
+    function applyDebugVisibility(){
+      elDebug.style.display = debugMode ? 'block' : 'none';
+      if(!debugMode){
+        elDebug.open = false;
+      }
+    }
+    applyDebugVisibility();
+
+    // ========= Excel 1行貼り付け（TSV）取り込み =========
+    // UIは一切変更せず、PDFドロップ領域クリック→Ctrl+V で貼り付けを受け取る。
+    // ※PDFドロップ/選択の既存挙動は維持する（この貼り付け処理は入力欄へ流し込むだけ。自動変換はしない）
+    const pasteSink = document.createElement('textarea');
+    pasteSink.id = 'kmtExcelPasteSink';
+    pasteSink.setAttribute('aria-hidden', 'true');
+    pasteSink.setAttribute('tabindex', '0');
+    pasteSink.autocomplete = 'off';
+    pasteSink.spellcheck = false;
+    pasteSink.style.position = 'fixed';
+    pasteSink.style.left = '-10000px';
+    pasteSink.style.top = '0';
+    pasteSink.style.width = '1px';
+    pasteSink.style.height = '1px';
+    pasteSink.style.opacity = '0';
+    pasteSink.style.pointerEvents = 'none';
+    document.body.appendChild(pasteSink);
+
+    // click-to-paste の視覚フィードバック（UI追加なし：既存の青枠と同じスタイル）
+    const PASTE_ARMED_CLASS = 'paste-armed';
+    function setPasteArmed(on){
+      try{ elDrop.classList.toggle(PASTE_ARMED_CLASS, !!on); }catch(_e){}
+    }
+    pasteSink.addEventListener('blur', ()=>{ setPasteArmed(false); });
+
+    // PDFドロップ領域をクリックしたら貼り付け受け皿へフォーカス（見た目は変えない）
+    elDrop.addEventListener('click', ()=>{
+      try{
+        setPasteArmed(true);
+        pasteSink.focus({preventScroll:true});
+        pasteSink.select();
+      }catch(_e){}
+    });
+
+    function toHalfDigits(str){
+      return String(str || '').replace(/[０-９]/g, (ch)=> String.fromCharCode(ch.charCodeAt(0) - 0xFEE0));
+    }
+
+    function circledNumberToPlain(str){
+      const map = {
+        '①':'1','②':'2','③':'3','④':'4','⑤':'5','⑥':'6','⑦':'7','⑧':'8','⑨':'9','⑩':'10',
+        '⑪':'11','⑫':'12','⑬':'13','⑭':'14','⑮':'15','⑯':'16','⑰':'17','⑱':'18','⑲':'19','⑳':'20'
+      };
+      return String(str || '').replace(/[①②③④⑤⑥⑦⑧⑨⑩⑪⑫⑬⑭⑮⑯⑰⑱⑲⑳]/g, (m)=> map[m] || m);
+    }
+
+    function normalizeTitleBrackets(s){
+      // 【】 <> ＜＞ 〔〕 《》 ≪≫ [] → ［］
+      return String(s || '')
+        .replace(/【/g,'［').replace(/】/g,'］')
+        .replace(/</g,'［').replace(/>/g,'］')
+        .replace(/＜/g,'［').replace(/＞/g,'］')
+        .replace(/〔/g,'［').replace(/〕/g,'］')
+        .replace(/《/g,'［').replace(/》/g,'］')
+        .replace(/≪/g,'［').replace(/≫/g,'］')
+        .replace(/\[/g,'［').replace(/\]/g,'］');
+    }
+
+    function stripAnyYear(s){
+      // 4桁年は全て削除（例：2026/、2026年）
+      let t = String(s || '').trim();
+      // 2026年
+      t = t.replace(/[0-9０-９]{4}\s*年\s*/g, '');
+      // 2026/ 2026／ 2026- 2026－ 2026.
+      t = t.replace(/[0-9０-９]{4}\s*[\/／\-－\.]\s*/g, '');
+      return t.trim();
+    }
+
+    function normalizeFinalDayNote(raw){
+      let t = String(raw || '').trim();
+      if(!t) return '';
+      // 先頭の「最終日は」「※」などを除去（残りを解析）
+      t = t.replace(/^※\s*/,'').replace(/^最終日は\s*/,'');
+      t = t.trim();
+
+      if(!t) return '';
+      // 「閉店」を含む場合は空欄と同じ扱い（会期への注記は付けない）
+      if(/閉店/.test(t)) return '';
+
+      // Fullwidth digits -> half for parsing
+      const tp = toHalfDigits(t);
+
+      // 24h time (e.g., 17:00 / 16:30)
+      let m = tp.match(/(\d{1,2})\s*[:：]\s*(\d{2})/);
+      if(m){
+        const hh = Math.max(0, Math.min(23, parseInt(m[1],10)));
+        const mm = Math.max(0, Math.min(59, parseInt(m[2],10)));
+        const isPM = hh >= 12;
+        const label = isPM ? '午後' : '午前';
+        const dispH = (hh === 0) ? 12 : (hh > 12 ? hh - 12 : hh);
+        const timeStr = (mm === 0) ? `${label}${dispH}時` : `${label}${dispH}時${mm}分`;
+        return `※最終日は${timeStr}閉場。`;
+      }
+
+      // e.g., 午後5時まで / 午後5時30分 / 午後５時閉場 / 午後5時
+      m = tp.match(/(午前|午後)\s*(\d{1,2})\s*時(?:\s*(\d{1,2})\s*分)?/);
+      if(m){
+        const label = m[1];
+        const hh = parseInt(m[2],10);
+        const mm = m[3] != null ? parseInt(m[3],10) : 0;
+        const timeStr = (mm === 0) ? `${label}${hh}時` : `${label}${hh}時${mm}分`;
+        return `※最終日は${timeStr}閉場。`;
+      }
+
+      // fallback（時間として解釈できない場合はそのまま注記化）
+      // 例: 「午後5時まで」以外の文言でも「※最終日は…。」に揃える
+      return `※最終日は${t.replace(/。+$/,'')}。`;
+    }
+
+    function normalizeFloor(raw){
+      let s = String(raw || '').trim();
+      if(!s) return '';
+      s = toHalfDigits(s);
+
+      if(s.includes('本館')){
+        return s;
+      }
+
+      // 地下1階 / 地下 1階 / 地下1
+      let m = s.match(/地下\s*([0-9]+)\s*階?/);
+      if(m){
+        return `本館地下${m[1]}階`;
+      }
+
+      // 1階 / 5階
+      m = s.match(/^([0-9]+)\s*階$/);
+      if(m){
+        return `本館${m[1]}階`;
+      }
+
+      // "1" のみ
+      m = s.match(/^([0-9]+)$/);
+      if(m){
+        return `本館${m[1]}階`;
+      }
+
+      // それ以外はそのまま（想定外）
+      return s;
+    }
+
+    function normalizeSpaceTokens(line){
+      let s = String(line || '');
+      // SPACE4-① / SPACE４－① / SPACE6-② など
+      s = s.replace(/SPACE\s*([0-9０-９]+)\s*[-－−‐―]\s*([0-9０-９①②③④⑤⑥⑦⑧⑨⑩⑪⑫⑬⑭⑮⑯⑰⑱⑲⑳]+)/g,
+        (_all, g1, g2)=>{
+          const n1 = toHalfDigits(g1);
+          let n2 = circledNumberToPlain(g2);
+          n2 = toHalfDigits(n2);
+          return `SPACE${n1}-${n2}`;
+        }
+      );
+      return s;
+    }
+
+    function normalizeVenueField(raw){
+      let s = normalizeCRLF(String(raw || ''));
+      // セル内改行がある場合は / で1行化（テスト通り）
+      const lines = s.split('\n').map(v=>v.trim()).filter(v=>v.length>0).map(normalizeSpaceTokens);
+      return lines.join(' / ');
+    }
+
+    function parseTSV(text){
+      // CSVと同じ引用符ルールで TSV をパース（セル内改行対応）
+      const s = normalizeCRLF(String(text || ''));
+      const rows = [];
+      let row = [];
+      let field = '';
+      let inQuotes = false;
+
+      for(let i=0; i<s.length; i++){
+        const ch = s[i];
+
+        if(ch === '"'){
+          if(inQuotes){
+            // escaped quote ("")
+            if(s[i+1] === '"'){
+              field += '"';
+              i++;
+            }else{
+              inQuotes = false;
+            }
+          }else{
+            inQuotes = true;
+          }
+          continue;
+        }
+
+        if(ch === '\t' && !inQuotes){
+          row.push(field);
+          field = '';
+          continue;
+        }
+
+        if(ch === '\n' && !inQuotes){
+          row.push(field);
+          field = '';
+          // push row (even if empty; cleaned later)
+          rows.push(row);
+          row = [];
+          continue;
+        }
+
+        field += ch;
+      }
+
+      // tail
+      row.push(field);
+      rows.push(row);
+
+      // remove trailing fully-empty rows
+      while(rows.length){
+        const r = rows[rows.length-1];
+        const allEmpty = r.every(v => String(v || '').trim() === '');
+        if(allEmpty) rows.pop();
+        else break;
+      }
+      return rows;
+    }
+
+    function isLikelyExcelRow(text){
+      const t = String(text || '');
+      if(!t.includes('\t')) return false;
+      // quick heuristic: at least 7 tabs (8 columns)
+      const tabCount = (t.match(/\t/g) || []).length;
+      return tabCount >= 7;
+    }
+
+    async function handleExcelPasteText(rawText){
+      const raw = String(rawText || '');
+      if(!isLikelyExcelRow(raw)){
+        // ignore (do not intervene)
+        setDebug({paste:{ignored:true, reason:'not_tsv_or_too_few_columns', sample: raw.slice(0, 200)}});
         return;
       }
-  
-      function applyDebugVisibility(){
-        elDebug.style.display = debugMode ? 'block' : 'none';
-        if(!debugMode){
-          elDebug.open = false;
-        }
+
+      const rows = parseTSV(raw);
+      const first = rows[0] || [];
+      const colCount = first.length;
+
+      // 必要列（1,4,5,6,7,8,9）= index 0,3,4,5,6,7,8 を想定
+      if(colCount < 8){
+        setStatus('貼り付け内容の列数が不足しています（Excelの1行をそのまま貼り付けてください）。');
+        setDebug({paste:{ok:false, reason:'insufficient_columns', colCount, first}});
+        return;
       }
-      applyDebugVisibility();
-  
-      // Hidden toggle for diagnostics (only for the person who knows the shortcut)
-      document.addEventListener('keydown', (e)=>{
-        if(e.ctrlKey && e.altKey && e.shiftKey && (e.code === 'KeyD' || e.key === 'D' || e.key === 'd')){
-          debugMode = !debugMode;
-          try{ localStorage.setItem(DEBUG_KEY, debugMode ? '1' : '0'); }catch(_e){}
-          applyDebugVisibility();
-          setStatus(debugMode ? '診断モード ON（抽出ログを表示）' : '診断モード OFF（抽出ログを非表示）');
+
+      const titleRaw = first[0] ?? '';
+      const startRaw = first[3] ?? '';
+      const endRaw = first[4] ?? '';
+      const endTimeRaw = first[5] ?? '';
+      const floorRaw = first[6] ?? '';
+      const venueRaw = first[7] ?? '';
+      const bodyPrimary = (first.length >= 9 ? (first[8] ?? '') : '');
+      const extraCols = (first.length > 9 ? first.slice(9) : []);
+
+      const title = normalizeTitleBrackets(titleRaw).trim();
+
+      const start = stripAnyYear(startRaw);
+      const end = stripAnyYear(endRaw);
+      let kaiki = `${start}-${end}`.trim();
+      const note = normalizeFinalDayNote(endTimeRaw);
+      if(note){
+        kaiki = `${kaiki} ${note}`.trim();
+      }
+
+      const floor = normalizeFloor(floorRaw);
+      const venueJoined = normalizeVenueField(venueRaw);
+      const venue = (venueJoined ? `${floor} ${venueJoined}`.trim() : floor);
+
+      // 本文：基本は9列目（テスト運用に合わせる）。追加列がある場合は診断に出すだけ。
+      const honbun = String(bodyPrimary || '').trim();
+
+      writeInputs({ title, kaiki, venue, honbun });
+
+      setStatus('貼り付け完了：入力欄に反映しました。必要なら「変換」を押してください。');
+      setDebug({
+        paste:{
+          ok:true,
+          rawPreview: raw.slice(0, 800),
+          rows: rows.length,
+          firstColCount: colCount,
+          mappedRaw: { titleRaw, startRaw, endRaw, endTimeRaw, floorRaw, venueRaw, bodyPrimary, extraCols },
+          out: { title, kaiki, venue, honbunPreview: honbun.slice(0, 400) }
         }
       });
-  
-      if(elPickBtn){
-        elPickBtn.addEventListener('click', ()=> elFile.click());
-      }
-  
-      // ========= Helpers =========
-      function setStatus(msg){
-        elStatus.textContent = msg || '';
-      }
-  
-      function setDebug(obj){
-        try{
-          elDebugPre.textContent = typeof obj === 'string' ? obj : JSON.stringify(obj, null, 2);
-        }catch(e){
-          elDebugPre.textContent = String(obj);
-        }
-      }
-  
-      function normalizeCRLF(s){
-        // Normalize line endings without altering content (NO OCR)
-        return (s ?? '').toString().replace(/\r\n/g, '\n').replace(/\r/g, '\n');
-      }
-  
-      function fireInput(el){
-        try{
-          el.dispatchEvent(new Event('input', {bubbles:true}));
-          el.dispatchEvent(new Event('change', {bubbles:true}));
-        }catch(e){}
-      }
-  
-      function qsInput(setName){
-        return document.querySelector('[data-set="'+setName+'"] textarea.input');
-      }
-  
-      function writeInputs(values){
-        const mapping = {
-          title: qsInput('title'),
-          kaiki: qsInput('kaiki'),
-          venue: qsInput('venue'),
-          honbun: qsInput('honbun'),
-        };
-        for(const k of Object.keys(mapping)){
-          const el = mapping[k];
-          if(!el) continue;
-          el.value = values[k] ?? '';
-          fireInput(el);
-        }
-      }
-  
-      // ========= PDF parsing =========
-      async function ensurePdfJs(){
-        if(window.pdfjsLib){
-          // already loaded
-          if(!pdfjsLib.GlobalWorkerOptions.workerSrc){
-            // default worker (only used if worker is enabled)
-            pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.worker.min.js';
-          }
+    }
+
+    pasteSink.addEventListener('paste', async (e)=>{
+      try{
+        const cd = e.clipboardData;
+        if(!cd) return;
+
+        // If a PDF file is in clipboard, treat it like selecting a PDF.
+        const items = cd.items ? Array.from(cd.items) : [];
+        const pdfItem = items.find(it => it.kind === 'file' && it.type === 'application/pdf');
+        if(pdfItem){
+          e.preventDefault();
+          const f = pdfItem.getAsFile();
+          setDebug({paste:{type:'pdf', name: f ? f.name : '', size: f ? f.size : 0}});
+          await handleFile(f);
+          pasteSink.value = '';
           return;
         }
-  
-        const SOURCES = [
-          // local (recommended for environments that block CDNs)
-          { lib: './pdf.min.js', worker: './pdf.worker.min.js', note: 'local: ./pdf.min.js' },
-          { lib: './pdfjs/pdf.min.js', worker: './pdfjs/pdf.worker.min.js', note: 'local: ./pdfjs/pdf.min.js' },
-  
-          // CDNs (fallback) - use a UMD build that exposes window.pdfjsLib
-          // (Newer PDF.js versions on CDNs may ship .mjs only; this is why we pin v3.4.120 here.)
-          { lib: 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.min.js',
-            worker: 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.worker.min.js',
-            note: 'cdnjs v3.4.120' },
-  
-          { lib: 'https://unpkg.com/pdfjs-dist@3.4.120/build/pdf.min.js',
-            worker: 'https://unpkg.com/pdfjs-dist@3.4.120/build/pdf.worker.min.js',
-            note: 'unpkg pdfjs-dist@3.4.120' },
-  
-          { lib: 'https://cdn.jsdelivr.net/npm/pdfjs-dist@3.4.120/build/pdf.min.js',
-            worker: 'https://cdn.jsdelivr.net/npm/pdfjs-dist@3.4.120/build/pdf.worker.min.js',
-            note: 'jsdelivr pdfjs-dist@3.4.120' },
-        ];
-  
-        const loadScript = (src) => new Promise((resolve, reject) => {
-          const s = document.createElement('script');
-          s.src = src;
-          s.async = true;
-          s.crossOrigin = 'anonymous';
-          s.onload = () => resolve();
-          s.onerror = () => reject(new Error('script load failed: ' + src));
-          document.head.appendChild(s);
-        });
-  
-        let lastErr = null;
-        for(const c of SOURCES){
-          try{
-            await loadScript(c.lib);
-            if(window.pdfjsLib){
-              // Worker source: set regardless; on file:// we disable worker later for safety.
-              pdfjsLib.GlobalWorkerOptions.workerSrc = c.worker;
-              setStatus('PDF.js 読み込み: ' + c.note);
-              return;
-            }
-          }catch(e){
-            lastErr = e;
-          }
+
+        const rawText = cd.getData('text/plain') || '';
+        // Handle TSV paste (Excel 1行)
+        if(isLikelyExcelRow(rawText)){
+          e.preventDefault();
+          await handleExcelPasteText(rawText);
+        }else{
+          // not TSV: do nothing (avoid intervention)
+          setDebug({paste:{ignored:true, reason:'not_likely_excel_row', sample: String(rawText).slice(0, 200)}});
         }
-  
-        // help message: local deploy option
-        const help =
-          'PDF.js の読み込みに失敗しました。\n\n' +
-          '原因の例: (1) 社内ネットワークでCDNがブロックされている / (2) オフライン / (3) file:// で開いている等。\n\n' +
-          '対策: リポジトリ（index.htmlと同じ階層）に「pdf.min.js」「pdf.worker.min.js」を置くか、' +
-          'または「/pdfjs/pdf.min.js」「/pdfjs/pdf.worker.min.js」として配置してください。\n' +
-          '（このページはローカルファイルでも、GitHub Pagesでも動作します）';
-        const err = new Error(help);
-        if(lastErr) err.cause = lastErr;
-        throw err;
+      }catch(err){
+        setStatus('貼り付け処理でエラー：' + (err && err.message ? err.message : String(err)));
+        setDebug({paste:{ok:false, error:String(err), stack: err && err.stack ? String(err.stack) : ''}});
+      }finally{
+        try{ pasteSink.value = ''; }catch(_e){}
       }
-  
-      function getTextFieldsFromAnnotations(annots){
-        const out = [];
-        for(const a of annots || []){
-          // Widget annotations represent form fields
-          const isWidget = (a.subtype === 'Widget' || a.annotationType === 20);
-          const isText = (a.fieldType === 'Tx' || a.fieldType === 'Text' || a.fieldType === 'FreeText');
-          const v = a.fieldValue;
-          if(isWidget && isText && typeof v === 'string'){
-            const val = normalizeCRLF(v).replace(/\u0000/g,'');
-            if(val.trim().length){
-              out.push({
-                fieldName: a.fieldName || '',
-                value: val,
-                // rect is useful for debug only; not used for extraction decision
-                rect: a.rect || null
-              });
-            }
-          }
-        }
-        return out;
+    });
+
+    // ========= end: Excel paste =========
+
+    // Hidden toggle for diagnostics (only for the person who knows the shortcut) (only for the person who knows the shortcut)
+    document.addEventListener('keydown', (e)=>{
+      if(e.ctrlKey && e.altKey && e.shiftKey && (e.code === 'KeyD' || e.key === 'D' || e.key === 'd')){
+        debugMode = !debugMode;
+        try{ localStorage.setItem(DEBUG_KEY, debugMode ? '1' : '0'); }catch(_e){}
+        applyDebugVisibility();
+        setStatus(debugMode ? '診断モード ON（抽出ログを表示）' : '診断モード OFF（抽出ログを非表示）');
       }
-  
-      function scoreFeatures(val){
-        const s = val || '';
-        const len = s.length;
-        const lines = s.split('\n').length;
-        const startsBullet = /^\s*■/.test(s);
-        const hasDate = /[0-9０-９]{1,2}月[0-9０-９]{1,2}日/.test(s) || /\b\d{1,2}\/\d{1,2}\b/.test(s);
-        const hasRange = /[〜～]/.test(s) || /[\-－—]/.test(s);
-        const hasFloor = /[0-9０-９]+階|\b[0-9０-９]+F\b|地下|B[0-9０-９]/i.test(s);
-        const hasStopTime = /閉場|午後|午前|\d{1,2}[:：]\d{2}/.test(s);
-        const hasMeta = /カテゴリー|綴じ|画像|メール|バナー|hp\d|ｈｐ\d/i.test(s)
-          || /[\.．](?:jpe?g|png|gif|webp|pdf|xlsx|xls|docx?|pptx?|zip|ｊｐｅ?ｇ|ｐｎｇ|ｇｉｆ|ｗｅｂｐ|ｐｄｆ|ｘｌｓｘ|ｘｌｓ|ｄｏｃｘ?|ｐｐｔｘ?|ｚｉｐ)(?:$|\s|[、,，．。])/i.test(s);
-        const punctuationCount = (s.match(/。/g) || []).length;
-        return {len, lines, startsBullet, hasDate, hasRange, hasFloor, hasStopTime, hasMeta, punctuationCount};
+    });
+
+    if(elPickBtn){
+      elPickBtn.addEventListener('click', ()=> elFile.click());
+    }
+
+    // ========= Helpers =========
+    function setStatus(msg){
+      elStatus.textContent = msg || '';
+    }
+
+    function setDebug(obj){
+      try{
+        elDebugPre.textContent = typeof obj === 'string' ? obj : JSON.stringify(obj, null, 2);
+      }catch(e){
+        elDebugPre.textContent = String(obj);
       }
-  
-      function classifyFromFormFields(fields){
-        // fields: [{value, fieldName, rect?, page?}]
-        // まずはテンプレ固定の fieldName を優先（最も安定）
-        // 想定：Text6=タイトル / Text7=会期 / Text8=会場 / Text9=本文 / Text10=画像など
-        const toName = (v)=> String(v||'').toLowerCase();
-  
-        function pickByFieldName(re){
-          const arr = (fields || [])
-            .filter(f => re.test(toName(f.fieldName)) && String(f.value||'').trim().length);
-          if(!arr.length) return null;
-          // 同名が複数ある場合は長い方を優先
-          arr.sort((a,b)=> String(b.value||'').length - String(a.value||'').length);
-          return arr[0];
-        }
-  
-        const named = {
-          title:  pickByFieldName(/text6(?!\d)/),
-          kaiki:  pickByFieldName(/text7(?!\d)/),
-          venue:  pickByFieldName(/text8(?!\d)/),
-          honbun: pickByFieldName(/text9(?!\d)/),
-          meta:   pickByFieldName(/text10(?!\d)/),
-        };
-  
-        const outNamed = {
-          title:  named.title?.value  ? String(named.title.value)  : '',
-          kaiki:  named.kaiki?.value  ? String(named.kaiki.value)  : '',
-          venue:  named.venue?.value  ? String(named.venue.value)  : '',
-          honbun: named.honbun?.value ? String(named.honbun.value) : '',
-        };
-  
-        const okKaikiNamed = /月/.test(outNamed.kaiki) && /日/.test(outNamed.kaiki);
-        const filledNamed = Object.values(outNamed).filter(v => String(v||'').trim().length > 0).length;
-  
-        // タイトルが「画像ファイル名/品番列挙」になる事故を強制的に回避
-        // （fieldName優先でも念のため保険）
-        const isBadTitle = looksLikeImageList(outNamed.title);
-        if(okKaikiNamed && filledNamed >= 3 && !isBadTitle){
-          return {
-            ok:true,
-            out: outNamed,
-            debug:{
-              reason:'form_fields_named',
-              picked:{
-                title: named.title?.fieldName,
-                kaiki: named.kaiki?.fieldName,
-                venue: named.venue?.fieldName,
-                honbun: named.honbun?.fieldName,
-                meta: named.meta?.fieldName
-              }
-            }
-          };
-        }
-  
-        // ===== fallback: スコアリング（fieldName の重み付け + 画像列挙の排除） =====
-        function looksLikeImageList(v){
-          const s0 = String(v||'').trim();
-          if(!s0) return false;
-  
-          // 拡張子（半角/全角）や TOP.jpg など
-          const hasExt = /[\.．](?:jpe?g|png|gif|webp|pdf|ｊｐｅ?ｇ|ｐｎｇ|ｇｉｆ|ｗｅｂｐ|ｐｄｆ)(?:$|\s|[、,，．。])/i.test(s0)
-            || /TOP[\.．](?:jpe?g|png|ｊｐｅ?ｇ|ｐｎｇ)/i.test(s0);
-  
-          // 丸数字が複数（①②③…）
-          const circ = (s0.match(/[①②③④⑤⑥⑦⑧⑨⑩⑪⑫⑬⑭⑮⑯⑰⑱⑲⑳]/g) || []).length;
-          const hasCircList = circ >= 2;
-  
-          // 「、」区切りが多い（列挙）
-          const commaCount = (s0.match(/[、,，]/g) || []).length;
-          const hasManyCommas = commaCount >= 2;
-  
-          return hasExt || hasCircList || (hasManyCommas && s0.length >= 30);
-        }
-  
-        const candidates = (fields || []).map(f => {
-          const value = (f.value || '').toString();
-          const feat = scoreFeatures(value);
-          const name = toName(f.fieldName);
-          const base = {fieldName: f.fieldName, value, feat};
-  
-          // name bonus (テンプレ固定に強く寄せる)
-          const bonusTitle  = /text6(?!\d)/.test(name) ? 50 : (/text10(?!\d)/.test(name) ? -50 : 0);
-          const bonusKaiki  = /text7(?!\d)/.test(name) ? 50 : 0;
-          const bonusVenue  = /text8(?!\d)/.test(name) ? 50 : 0;
-          const bonusBody   = /text9(?!\d)/.test(name) ? 50 : 0;
-  
-          const imgLikePenalty = looksLikeImageList(value) ? -60 : 0;
-  
-          // Scoring per category
-          const scoreKaiki =
-            bonusKaiki +
-            (feat.hasDate ? 5 : 0) +
-            (feat.hasRange ? 3 : 0) +
-            (feat.startsBullet ? 2 : 0) +
-            (!feat.hasMeta ? 1 : -4) +
-            (feat.len <= 140 ? 1 : -4) +
-            (feat.hasFloor ? -2 : 0);
-  
-          const scoreVenue =
-            bonusVenue +
-            (feat.startsBullet ? 3 : 0) +
-            (feat.hasFloor ? 5 : 0) +
-            (feat.hasStopTime ? 2 : 0) +
-            (!feat.hasMeta ? 1 : -4) +
-            (feat.hasDate && feat.hasRange ? -4 : 0) +
-            (feat.len <= 220 ? 1 : -3);
-  
-          const scoreTitle =
-            bonusTitle + imgLikePenalty +
-            ((feat.len >= 2 && feat.len <= 90) ? 5 : (feat.len <= 140 ? 1 : -4)) +
-            (feat.lines === 1 ? 2 : -1) +
-            (!feat.startsBullet ? 1 : -4) +
-            (!feat.hasDate ? 1 : -4) +
-            (!feat.hasMeta ? 1 : -4);
-  
-          const scoreBody =
-            bonusBody +
-            (feat.len >= 120 ? 6 : (feat.len >= 60 ? 2 : -4)) +
-            (feat.lines >= 3 ? 2 : 0) +
-            (feat.punctuationCount >= 2 ? 1 : 0) +
-            (!feat.hasMeta ? 2 : -4);
-  
-          return {...base, scoreKaiki, scoreVenue, scoreTitle, scoreBody};
-        });
-  
-        function pickBest(key, usedSet){
-          const sorted = candidates
-            .filter(c => !usedSet.has(c))
-            .slice()
-            .sort((a,b)=> (b[key]-a[key]) || (b.feat.len-a.feat.len));
-          return sorted[0] || null;
-        }
-  
-        const used = new Set();
-        const picked = {title:null, kaiki:null, venue:null, honbun:null};
-  
-        // pick distinctive ones first
-        picked.kaiki = pickBest('scoreKaiki', used); if(picked.kaiki) used.add(picked.kaiki);
-        picked.venue = pickBest('scoreVenue', used); if(picked.venue) used.add(picked.venue);
-        picked.honbun = pickBest('scoreBody', used);  if(picked.honbun) used.add(picked.honbun);
-        picked.title = pickBest('scoreTitle', used);  if(picked.title) used.add(picked.title);
-  
-        const out = {
-          title: picked.title?.value || '',
-          kaiki: picked.kaiki?.value || '',
-          venue: picked.venue?.value || '',
-          honbun: picked.honbun?.value || '',
-        };
-  
-        // Basic validation: must have at least 3/4, and kaiki must look like date range
-        const okKaiki = /月/.test(out.kaiki) && /日/.test(out.kaiki);
-        const filledCount = Object.values(out).filter(v => (v || '').trim().length > 0).length;
-        if(!okKaiki || filledCount < 3){
-          return {ok:false, out, debug:{reason:'validation_failed', candidates}};
-        }
-        return {ok:true, out, debug:{reason:'form_fields_scored', candidates, picked:{title:picked.title?.fieldName, kaiki:picked.kaiki?.fieldName, venue:picked.venue?.fieldName, honbun:picked.honbun?.fieldName}}};
+    }
+
+    function normalizeCRLF(s){
+      // Normalize line endings without altering content (NO OCR)
+      return (s ?? '').toString().replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+    }
+
+    function fireInput(el){
+      try{
+        el.dispatchEvent(new Event('input', {bubbles:true}));
+        el.dispatchEvent(new Event('change', {bubbles:true}));
+      }catch(e){}
+    }
+
+    function qsInput(setName){
+      return document.querySelector('[data-set="'+setName+'"] textarea.input');
+    }
+
+    function writeInputs(values){
+      const mapping = {
+        title: qsInput('title'),
+        kaiki: qsInput('kaiki'),
+        venue: qsInput('venue'),
+        honbun: qsInput('honbun'),
+      };
+      for(const k of Object.keys(mapping)){
+        const el = mapping[k];
+        if(!el) continue;
+        el.value = values[k] ?? '';
+        fireInput(el);
       }
-  
-      function buildLinesFromTextItems(items){
-        // items: [{str, x, y, w, h}]
-        const filtered = items.filter(it => it.str && it.str.trim().length);
-        // Group by y (quantized)
-        const buckets = new Map();
-        for(const it of filtered){
-          const yKey = Math.round(it.y * 2) / 2; // 0.5pt granularity
-          if(!buckets.has(yKey)) buckets.set(yKey, []);
-          buckets.get(yKey).push(it);
+    }
+
+    // ========= PDF parsing =========
+    async function ensurePdfJs(){
+      if(window.pdfjsLib){
+        // already loaded
+        if(!pdfjsLib.GlobalWorkerOptions.workerSrc){
+          // default worker (only used if worker is enabled)
+          pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.worker.min.js';
         }
-        // Sort lines by y desc
-        const yKeys = Array.from(buckets.keys()).sort((a,b)=>b-a);
-        const lines = [];
-        for(const y of yKeys){
-          const row = buckets.get(y).slice().sort((a,b)=>a.x-b.x);
-          let line = '';
-          let prevEnd = null;
-          for(const it of row){
-            if(prevEnd != null){
-              const gap = it.x - prevEnd;
-              if(gap > 2 && !line.endsWith(' ') && !it.str.startsWith(' ')){
-                line += ' ';
-              }
-            }
-            line += it.str;
-            prevEnd = it.x + (it.w ?? 0);
-          }
-          lines.push(line.replace(/\s+$/,''));
-        }
-        return lines;
+        return;
       }
-  
-      function extractByAnchorsFromLines(lines){
-        const idx = {
-          title: -1,
-          kaiki: -1,
-          venue: -1,
-          honbun: -1
-        };
-        const reTitle = /【\s*タイトル\s*】/;
-        const reKaiki = /【\s*会期\s*】/;
-        const reVenue = /【\s*会場\s*】/;
-        const reHonbun = /【\s*本文\s*】/;
-  
-        for(let i=0;i<lines.length;i++){
-          const t = lines[i];
-          if(idx.title<0 && reTitle.test(t)) idx.title = i;
-          if(idx.kaiki<0 && reKaiki.test(t)) idx.kaiki = i;
-          if(idx.venue<0 && reVenue.test(t)) idx.venue = i;
-          if(idx.honbun<0 && reHonbun.test(t)) idx.honbun = i;
-        }
-        if(idx.title<0 || idx.kaiki<0 || idx.venue<0 || idx.honbun<0){
-          return {ok:false, out:{title:'',kaiki:'',venue:'',honbun:''}, debug:{reason:'anchors_missing', idx, sample:lines.slice(0,120)}};
-        }
-  
-        function block(start, end){
-          const a = lines[start] || '';
-          // take same-line content after the first "】"
-          let first = a.replace(/.*?】/, '');
-          if(first.startsWith('　') || first.startsWith(' ')) first = first.replace(/^[\s　]+/, '');
-          const arr = [];
-          if(first.trim().length) arr.push(first);
-          for(let i=start+1;i<end;i++){
-            arr.push(lines[i]);
-          }
-          // Trim leading/trailing empty lines
-          while(arr.length && arr[0].trim()==='') arr.shift();
-          while(arr.length && arr[arr.length-1].trim()==='') arr.pop();
-          return arr.join('\n');
-        }
-  
-        const out = {
-          title: block(idx.title, idx.kaiki),
-          kaiki: block(idx.kaiki, idx.venue),
-          venue: block(idx.venue, idx.honbun),
-          honbun: block(idx.honbun, lines.length),
-        };
-  
-        const ok = out.title.trim().length>0 && out.kaiki.trim().length>0 && out.venue.trim().length>0 && out.honbun.trim().length>0;
-        return {ok, out, debug:{reason:'anchors', idx, sample:lines.slice(Math.max(0, idx.title-3), Math.min(lines.length, idx.honbun+40))}};
-      }
-  
-      async function extractFromPdf(file){
-        await ensurePdfJs();
-  
-        const buf = await file.arrayBuffer();
-        const loadingTask = pdfjsLib.getDocument({ disableWorker: true, data: buf});
-        const pdf = await loadingTask.promise;
-  
-        const debug = {numPages: pdf.numPages};
-  
-        // --- Try form fields first (best fidelity) ---
-        let allFields = [];
-        for(let p=1; p<=Math.min(pdf.numPages, 3); p++){
-          const page = await pdf.getPage(p);
-          const annots = await page.getAnnotations({intent:'display'});
-          const fields = getTextFieldsFromAnnotations(annots);
-          if(fields.length){
-            allFields = allFields.concat(fields.map(f => ({...f, page:p})));
-          }
-        }
-        debug.formFieldCount = allFields.length;
-  
-        if(allFields.length){
-          const r = classifyFromFormFields(allFields);
-          debug.form = r.debug;
-          if(r.ok){
-            return {ok:true, out:r.out, debug};
-          }
-        }
-  
-        // --- Fallback: text layer + anchors ---
-        let allLines = [];
-        for(let p=1; p<=Math.min(pdf.numPages, 3); p++){
-          const page = await pdf.getPage(p);
-          const tc = await page.getTextContent({disableCombineTextItems:false});
-          const items = (tc.items || []).map(it => ({
-            str: it.str || '',
-            x: (it.transform && it.transform[4]) ? it.transform[4] : 0,
-            y: (it.transform && it.transform[5]) ? it.transform[5] : 0,
-            w: it.width || 0,
-            h: it.height || 0
-          }));
-          const lines = buildLinesFromTextItems(items);
-          allLines = allLines.concat(lines);
-        }
-        debug.textLinesSample = allLines.slice(0, 80);
-  
-        const r2 = extractByAnchorsFromLines(allLines);
-        debug.anchor = r2.debug;
-  
-        if(r2.ok){
-          return {ok:true, out:r2.out, debug};
-        }
-        return {ok:false, out:r2.out, debug};
-      }
-  
-      // ========= UI wiring =========
-      async function handleFile(file){
-        if(!file) return;
-        if(file.type !== 'application/pdf' && !file.name.toLowerCase().endsWith('.pdf')){
-          setStatus('PDFファイルを選択してください。');
-          return;
-        }
-        setStatus('PDFを解析中…（OCRは使いません）');
-        setDebug('');
+
+      const SOURCES = [
+        // local (recommended for environments that block CDNs)
+        { lib: './pdf.min.js', worker: './pdf.worker.min.js', note: 'local: ./pdf.min.js' },
+        { lib: './pdfjs/pdf.min.js', worker: './pdfjs/pdf.worker.min.js', note: 'local: ./pdfjs/pdf.min.js' },
+
+        // CDNs (fallback) - use a UMD build that exposes window.pdfjsLib
+        // (Newer PDF.js versions on CDNs may ship .mjs only; this is why we pin v3.4.120 here.)
+        { lib: 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.min.js',
+          worker: 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.worker.min.js',
+          note: 'cdnjs v3.4.120' },
+
+        { lib: 'https://unpkg.com/pdfjs-dist@3.4.120/build/pdf.min.js',
+          worker: 'https://unpkg.com/pdfjs-dist@3.4.120/build/pdf.worker.min.js',
+          note: 'unpkg pdfjs-dist@3.4.120' },
+
+        { lib: 'https://cdn.jsdelivr.net/npm/pdfjs-dist@3.4.120/build/pdf.min.js',
+          worker: 'https://cdn.jsdelivr.net/npm/pdfjs-dist@3.4.120/build/pdf.worker.min.js',
+          note: 'jsdelivr pdfjs-dist@3.4.120' },
+      ];
+
+      const loadScript = (src) => new Promise((resolve, reject) => {
+        const s = document.createElement('script');
+        s.src = src;
+        s.async = true;
+        s.crossOrigin = 'anonymous';
+        s.onload = () => resolve();
+        s.onerror = () => reject(new Error('script load failed: ' + src));
+        document.head.appendChild(s);
+      });
+
+      let lastErr = null;
+      for(const c of SOURCES){
         try{
-          const result = await extractFromPdf(file);
-          setDebug(result.debug);
-  
-          if(!result.ok){
-            setStatus('抽出に失敗しました。PDFの形式が想定と異なる可能性があります。診断を開いて確認してください。');
-            // do not overwrite inputs if failed
+          await loadScript(c.lib);
+          if(window.pdfjsLib){
+            // Worker source: set regardless; on file:// we disable worker later for safety.
+            pdfjsLib.GlobalWorkerOptions.workerSrc = c.worker;
+            setStatus('PDF.js 読み込み: ' + c.note);
             return;
           }
-  
-          // Write into INPUT fields only (non-breaking to CMS extension)
-          writeInputs({
-            title: result.out.title,
-            kaiki: result.out.kaiki,
-            venue: result.out.venue,
-            honbun: result.out.honbun
-          });
-  
-          setStatus('抽出完了：入力欄に反映しました。必要なら「変換」を押してください。');
-        }catch(err){
-          setStatus('エラー：' + (err && err.message ? err.message : String(err)));
-          setDebug({error:String(err), stack: err && err.stack ? String(err.stack) : ''});
-        }finally{
-          // reset file input (allow re-select same file)
-          try{ elFile.value = ''; }catch(e){}
+        }catch(e){
+          lastErr = e;
         }
       }
-  
-      elFile.addEventListener('change', (e)=>{
-        const f = e.target.files && e.target.files[0];
-        handleFile(f);
+
+      // help message: local deploy option
+      const help =
+        'PDF.js の読み込みに失敗しました。\n\n' +
+        '原因の例: (1) 社内ネットワークでCDNがブロックされている / (2) オフライン / (3) file:// で開いている等。\n\n' +
+        '対策: リポジトリ（index.htmlと同じ階層）に「pdf.min.js」「pdf.worker.min.js」を置くか、' +
+        'または「/pdfjs/pdf.min.js」「/pdfjs/pdf.worker.min.js」として配置してください。\n' +
+        '（このページはローカルファイルでも、GitHub Pagesでも動作します）';
+      const err = new Error(help);
+      if(lastErr) err.cause = lastErr;
+      throw err;
+    }
+
+    function getTextFieldsFromAnnotations(annots){
+      const out = [];
+      for(const a of annots || []){
+        // Widget annotations represent form fields
+        const isWidget = (a.subtype === 'Widget' || a.annotationType === 20);
+        const isText = (a.fieldType === 'Tx' || a.fieldType === 'Text' || a.fieldType === 'FreeText');
+        const v = a.fieldValue;
+        if(isWidget && isText && typeof v === 'string'){
+          const val = normalizeCRLF(v).replace(/\u0000/g,'');
+          if(val.trim().length){
+            out.push({
+              fieldName: a.fieldName || '',
+              value: val,
+              // rect is useful for debug only; not used for extraction decision
+              rect: a.rect || null
+            });
+          }
+        }
+      }
+      return out;
+    }
+
+    function scoreFeatures(val){
+      const s = String(val || '');
+      const len = s.length;
+      const lines = s.split('\n').length;
+      const startsBullet = /^\s*■/.test(s);
+
+      const half = (typeof toHalfDigits === 'function') ? toHalfDigits(s) : s;
+      const hasDate =
+        /[0-9０-９]{1,2}月[0-9０-９]{1,2}日/.test(s) ||
+        /\b\d{1,2}\/\d{1,2}\b/.test(half);
+
+      const hasRange = /[〜～]/.test(s) || /[\-－—]/.test(s);
+      const hasFloor = /[0-9０-９]+階|\b[0-9０-９]+F\b|地下|B[0-9０-９]/i.test(s);
+      const hasStopTime = /閉場|午後|午前|\d{1,2}[:：]\d{2}/.test(s);
+
+      const hasImageExt = /\.(jpe?g|png|gif|webp|pdf)\b/i.test(s);
+      const circledCount = (s.match(/[①②③④⑤⑥⑦⑧⑨⑩⑪⑫⑬⑭⑮⑯⑰⑱⑲⑳]/g) || []).length;
+      const hasCircledSeq = circledCount >= 2;
+      const hasImageList = hasImageExt || hasCircledSeq || /TOP\.(jpe?g|png)/i.test(s);
+
+      const hasMeta =
+        /カテゴリー|綴じ|画像|メール|バナー|hp\d|ｈｐ\d/i.test(s) ||
+        hasImageList;
+
+      const punctuationCount = (s.match(/。/g) || []).length;
+
+      return {
+        len, lines, startsBullet, hasDate, hasRange, hasFloor, hasStopTime,
+        hasImageExt, circledCount, hasImageList,
+        hasMeta, punctuationCount
+      };
+    }
+
+    function classifyFromFormFields(fields){
+      // fields: [{value, fieldName, rect, page}]
+      const debug = {reason:'form_fields', strategy:[], byName:{}, picked:{}, candidates:[]};
+
+      function normKey(name){
+        const n = String(name || '').trim();
+        const m = n.match(/Text\d+/i);
+        return m ? m[0] : n;
+      }
+
+      function isLikelyImageList(val){
+        const s = String(val || '').trim();
+        if(!s) return false;
+        const ext = /\.(jpe?g|png|gif|webp|pdf)\b/i.test(s);
+        const circled = (s.match(/[①②③④⑤⑥⑦⑧⑨⑩⑪⑫⑬⑭⑮⑯⑰⑱⑲⑳]/g) || []).length;
+        const top = /TOP\.(jpe?g|png)/i.test(s);
+        return ext || top || circled >= 2;
+      }
+
+      function pickLongest(map, key){
+        const arr = map.get(key);
+        if(!arr || !arr.length) return '';
+        let best = '';
+        for(const v of arr){
+          const t = String(v || '');
+          if(t.trim().length && t.trim().length > best.trim().length) best = t;
+        }
+        return best;
+      }
+
+      // --- 1) Prefer stable field names for this template ---
+      const byKey = new Map();
+      for(const f of fields || []){
+        const k = normKey(f.fieldName);
+        if(!k) continue;
+        if(!byKey.has(k)) byKey.set(k, []);
+        byKey.get(k).push(f.value);
+      }
+
+      const out = {title:'', kaiki:'', venue:'', honbun:''};
+
+      const t6 = pickLongest(byKey, 'Text6');
+      const t7 = pickLongest(byKey, 'Text7');
+      const t8 = pickLongest(byKey, 'Text8');
+      const t9 = pickLongest(byKey, 'Text9');
+
+      if(t6) out.title = t6;
+      if(t7) out.kaiki = t7;
+      if(t8) out.venue = t8;
+      if(t9) out.honbun = t9;
+
+      debug.byName = {
+        Text6: t6 ? t6.slice(0,160) : '',
+        Text7: t7 ? t7.slice(0,160) : '',
+        Text8: t8 ? t8.slice(0,160) : '',
+        Text9: t9 ? t9.slice(0,160) : ''
+      };
+
+      if(out.title && isLikelyImageList(out.title)){
+        debug.strategy.push('reject title(Text6): looks_like_image_list');
+        out.title = '';
+      }
+      if(out.honbun && isLikelyImageList(out.honbun)){
+        debug.strategy.push('reject honbun(Text9): looks_like_image_list');
+        out.honbun = '';
+      }
+
+      // --- 2) Fill missing by scoring (avoid image-list for title/body) ---
+      const candidates = (fields || []).map(f => {
+        const value = String(f.value || '');
+        const feat = scoreFeatures(value);
+        const base = {fieldName: f.fieldName || '', value, feat};
+
+        const scoreKaiki =
+          (feat.hasDate ? 5 : 0) +
+          (feat.hasRange ? 3 : 0) +
+          (feat.startsBullet ? 2 : 0) +
+          (!feat.hasMeta ? 1 : -4) +
+          (feat.len <= 180 ? 1 : -4) +
+          (feat.hasFloor ? -2 : 0) +
+          (feat.hasImageList ? -8 : 0);
+
+        const scoreVenue =
+          (feat.startsBullet ? 3 : 0) +
+          (feat.hasFloor ? 5 : 0) +
+          (feat.hasStopTime ? 2 : 0) +
+          (!feat.hasMeta ? 1 : -4) +
+          (feat.hasDate && feat.hasRange ? -4 : 0) +
+          (feat.len <= 260 ? 1 : -3) +
+          (feat.hasImageList ? -8 : 0);
+
+        const scoreTitle =
+          ((feat.len >= 2 && feat.len <= 90) ? 5 : (feat.len <= 140 ? 1 : -4)) +
+          (feat.lines === 1 ? 2 : -1) +
+          (!feat.startsBullet ? 1 : -4) +
+          (!feat.hasDate ? 1 : -4) +
+          (!feat.hasMeta ? 1 : -4) +
+          (feat.hasImageList ? -10 : 0);
+
+        const scoreBody =
+          (feat.len >= 120 ? 6 : (feat.len >= 60 ? 2 : -4)) +
+          (feat.lines >= 3 ? 2 : 0) +
+          (feat.punctuationCount >= 2 ? 1 : 0) +
+          (!feat.hasMeta ? 2 : -4) +
+          (feat.hasImageList ? -10 : 0);
+
+        return {...base, scoreKaiki, scoreVenue, scoreTitle, scoreBody};
       });
-  
-      elDrop.addEventListener('dragover', (e)=>{
-        e.preventDefault();
-        e.dataTransfer.dropEffect = 'copy';
-        elDrop.classList.add('dragover');
-      });
-      elDrop.addEventListener('dragleave', ()=>{
-        elDrop.classList.remove('dragover');
-      });
-      elDrop.addEventListener('drop', (e)=>{
-        e.preventDefault();
-        elDrop.classList.remove('dragover');
-        const f = e.dataTransfer.files && e.dataTransfer.files[0];
-        handleFile(f);
-      });
-  
-          
-  })();
-    </script>
+
+      debug.candidates = candidates.map(c => ({
+        fieldName: c.fieldName,
+        len: c.feat.len,
+        lines: c.feat.lines,
+        hasDate: c.feat.hasDate,
+        hasFloor: c.feat.hasFloor,
+        hasImageList: c.feat.hasImageList,
+        scoreTitle: c.scoreTitle,
+        scoreKaiki: c.scoreKaiki,
+        scoreVenue: c.scoreVenue,
+        scoreBody: c.scoreBody,
+        preview: String(c.value || '').slice(0, 60)
+      }));
+
+      // mark used by fieldName key if already taken by name mapping
+      const usedKeys = new Set();
+      if(t6) usedKeys.add(normKey('Text6'));
+      if(t7) usedKeys.add(normKey('Text7'));
+      if(t8) usedKeys.add(normKey('Text8'));
+      if(t9) usedKeys.add(normKey('Text9'));
+
+      function pickBest(key, forbidImageList){
+        const sorted = candidates
+          .filter(c => {
+            const k = normKey(c.fieldName);
+            if(usedKeys.has(k)) return false;
+            if(forbidImageList && c.feat.hasImageList) return false;
+            return true;
+          })
+          .slice()
+          .sort((a,b)=> (b[key]-a[key]) || (b.feat.len-a.feat.len));
+        return sorted[0] || null;
+      }
+
+      if(!out.kaiki){
+        const b = pickBest('scoreKaiki', false);
+        if(b){ out.kaiki = b.value; debug.strategy.push('fill kaiki by scoring'); debug.picked.kaiki = b.fieldName; usedKeys.add(normKey(b.fieldName)); }
+      }
+      if(!out.venue){
+        const b = pickBest('scoreVenue', false);
+        if(b){ out.venue = b.value; debug.strategy.push('fill venue by scoring'); debug.picked.venue = b.fieldName; usedKeys.add(normKey(b.fieldName)); }
+      }
+      if(!out.honbun){
+        const b = pickBest('scoreBody', true);
+        if(b){ out.honbun = b.value; debug.strategy.push('fill honbun by scoring'); debug.picked.honbun = b.fieldName; usedKeys.add(normKey(b.fieldName)); }
+      }
+      if(!out.title){
+        const b = pickBest('scoreTitle', true);
+        if(b){ out.title = b.value; debug.strategy.push('fill title by scoring'); debug.picked.title = b.fieldName; usedKeys.add(normKey(b.fieldName)); }
+      }
+
+      // Relaxed validation: for writing inputs, we only require honbun + at least one of others.
+      const filledCount = Object.values(out).filter(v => String(v||'').trim().length > 0).length;
+      const ok = String(out.honbun||'').trim().length > 0 && filledCount >= 2;
+
+      return {ok, out, debug};
+    }
+
+    function buildLinesFromTextItems(items){
+      // items: [{str, x, y, w, h}]
+      const filtered = items.filter(it => it.str && it.str.trim().length);
+      // Group by y (quantized)
+      const buckets = new Map();
+      for(const it of filtered){
+        const yKey = Math.round(it.y * 2) / 2; // 0.5pt granularity
+        if(!buckets.has(yKey)) buckets.set(yKey, []);
+        buckets.get(yKey).push(it);
+      }
+      // Sort lines by y desc
+      const yKeys = Array.from(buckets.keys()).sort((a,b)=>b-a);
+      const lines = [];
+      for(const y of yKeys){
+        const row = buckets.get(y).slice().sort((a,b)=>a.x-b.x);
+        let line = '';
+        let prevEnd = null;
+        for(const it of row){
+          if(prevEnd != null){
+            const gap = it.x - prevEnd;
+            if(gap > 2 && !line.endsWith(' ') && !it.str.startsWith(' ')){
+              line += ' ';
+            }
+          }
+          line += it.str;
+          prevEnd = it.x + (it.w ?? 0);
+        }
+        lines.push(line.replace(/\s+$/,''));
+      }
+      return lines;
+    }
+
+    function extractByAnchorsFromLines(lines){
+      const idx = {
+        title: -1,
+        kaiki: -1,
+        venue: -1,
+        honbun: -1
+      };
+      const reTitle = /【\s*タイトル\s*】/;
+      const reKaiki = /【\s*会期\s*】/;
+      const reVenue = /【\s*会場\s*】/;
+      const reHonbun = /【\s*本文\s*】/;
+
+      for(let i=0;i<lines.length;i++){
+        const t = lines[i];
+        if(idx.title<0 && reTitle.test(t)) idx.title = i;
+        if(idx.kaiki<0 && reKaiki.test(t)) idx.kaiki = i;
+        if(idx.venue<0 && reVenue.test(t)) idx.venue = i;
+        if(idx.honbun<0 && reHonbun.test(t)) idx.honbun = i;
+      }
+      if(idx.title<0 || idx.kaiki<0 || idx.venue<0 || idx.honbun<0){
+        return {ok:false, out:{title:'',kaiki:'',venue:'',honbun:''}, debug:{reason:'anchors_missing', idx, sample:lines.slice(0,120)}};
+      }
+
+      function block(start, end){
+        const a = lines[start] || '';
+        // take same-line content after the first "】"
+        let first = a.replace(/.*?】/, '');
+        if(first.startsWith('　') || first.startsWith(' ')) first = first.replace(/^[\s　]+/, '');
+        const arr = [];
+        if(first.trim().length) arr.push(first);
+        for(let i=start+1;i<end;i++){
+          arr.push(lines[i]);
+        }
+        // Trim leading/trailing empty lines
+        while(arr.length && arr[0].trim()==='') arr.shift();
+        while(arr.length && arr[arr.length-1].trim()==='') arr.pop();
+        return arr.join('\n');
+      }
+
+      const out = {
+        title: block(idx.title, idx.kaiki),
+        kaiki: block(idx.kaiki, idx.venue),
+        venue: block(idx.venue, idx.honbun),
+        honbun: block(idx.honbun, lines.length),
+      };
+
+      const ok = out.title.trim().length>0 && out.kaiki.trim().length>0 && out.venue.trim().length>0 && out.honbun.trim().length>0;
+      return {ok, out, debug:{reason:'anchors', idx, sample:lines.slice(Math.max(0, idx.title-3), Math.min(lines.length, idx.honbun+40))}};
+    }
+
+    async async function extractFromPdf(file){
+      await ensurePdfJs();
+
+      const buf = await file.arrayBuffer();
+      const loadingTask = pdfjsLib.getDocument({ disableWorker: true, data: buf});
+      const pdf = await loadingTask.promise;
+
+      const debug = {numPages: pdf.numPages};
+
+      // --- Try form fields first (best fidelity) ---
+      let allFields = [];
+      for(let p=1; p<=Math.min(pdf.numPages, 3); p++){
+        const page = await pdf.getPage(p);
+        const annots = await page.getAnnotations({intent:'display'});
+        const fields = getTextFieldsFromAnnotations(annots);
+        if(fields.length){
+          allFields = allFields.concat(fields.map(f => ({...f, page:p})));
+        }
+      }
+      debug.formFieldCount = allFields.length;
+
+      let out = {title:'', kaiki:'', venue:'', honbun:''};
+      let usedForm = false;
+
+      if(allFields.length){
+        const r = classifyFromFormFields(allFields);
+        debug.form = r.debug;
+        out = r.out;
+        usedForm = Object.values(out).some(v => String(v||'').trim().length > 0);
+
+        // If we got something from form fields, fill ONLY missing parts by anchors (never overwrite filled form values).
+        if(usedForm){
+          const needKeys = Object.keys(out).filter(k => !String(out[k]||'').trim().length);
+          if(needKeys.length){
+            let allLines = [];
+            for(let p=1; p<=Math.min(pdf.numPages, 3); p++){
+              const page = await pdf.getPage(p);
+              const tc = await page.getTextContent({disableCombineTextItems:false});
+              const items = (tc.items || []).map(it => ({
+                str: it.str || '',
+                x: (it.transform && it.transform[4]) ? it.transform[4] : 0,
+                y: (it.transform && it.transform[5]) ? it.transform[5] : 0,
+                w: it.width || 0,
+                h: it.height || 0
+              }));
+              const lines = buildLinesFromTextItems(items);
+              allLines = allLines.concat(lines);
+            }
+            debug.textLinesSample = allLines.slice(0, 80);
+
+            const r2 = extractByAnchorsFromLines(allLines);
+            debug.anchor = r2.debug;
+
+            for(const k of needKeys){
+              const v = r2.out && r2.out[k] ? String(r2.out[k]) : '';
+              if(v.trim().length) out[k] = v;
+            }
+          }
+        }
+      }
+
+      if(usedForm){
+        const filledCount = Object.values(out).filter(v => String(v||'').trim().length > 0).length;
+        const ok = String(out.honbun||'').trim().length > 0 && filledCount >= 2;
+        return {ok, out, debug};
+      }
+
+      // --- Fallback: text layer + anchors ---
+      let allLines = [];
+      for(let p=1; p<=Math.min(pdf.numPages, 3); p++){
+        const page = await pdf.getPage(p);
+        const tc = await page.getTextContent({disableCombineTextItems:false});
+        const items = (tc.items || []).map(it => ({
+          str: it.str || '',
+          x: (it.transform && it.transform[4]) ? it.transform[4] : 0,
+          y: (it.transform && it.transform[5]) ? it.transform[5] : 0,
+          w: it.width || 0,
+          h: it.height || 0
+        }));
+        const lines = buildLinesFromTextItems(items);
+        allLines = allLines.concat(lines);
+      }
+      debug.textLinesSample = allLines.slice(0, 80);
+
+      const r2 = extractByAnchorsFromLines(allLines);
+      debug.anchor = r2.debug;
+
+      if(r2.ok){
+        return {ok:true, out:r2.out, debug};
+      }
+      // even if anchors are incomplete, return what we have (do not write inputs unless ok in UI handler)
+      return {ok:false, out:r2.out, debug};
+    }
+
+    // ========= UI wiring =========
+    async function handleFile(file){
+      if(!file) return;
+      if(file.type !== 'application/pdf' && !file.name.toLowerCase().endsWith('.pdf')){
+        setStatus('PDFファイルを選択してください。');
+        return;
+      }
+      setStatus('PDFを解析中…（OCRは使いません）');
+      setDebug('');
+      try{
+        const result = await extractFromPdf(file);
+        setDebug(result.debug);
+
+        if(!result.ok){
+          setStatus('抽出に失敗しました。PDFの形式が想定と異なる可能性があります。診断を開いて確認してください。');
+          // do not overwrite inputs if failed
+          return;
+        }
+
+        // Write into INPUT fields only (non-breaking to CMS extension)
+        writeInputs({
+          title: result.out.title,
+          kaiki: result.out.kaiki,
+          venue: result.out.venue,
+          honbun: result.out.honbun
+        });
+
+        setStatus('抽出完了：入力欄に反映しました。必要なら「変換」を押してください。');
+      }catch(err){
+        setStatus('エラー：' + (err && err.message ? err.message : String(err)));
+        setDebug({error:String(err), stack: err && err.stack ? String(err.stack) : ''});
+      }finally{
+        // reset file input (allow re-select same file)
+        try{ elFile.value = ''; }catch(e){}
+      }
+    }
+
+    elFile.addEventListener('change', (e)=>{
+      const f = e.target.files && e.target.files[0];
+      handleFile(f);
+    });
+
+    elDrop.addEventListener('dragover', (e)=>{
+      e.preventDefault();
+      e.dataTransfer.dropEffect = 'copy';
+      elDrop.classList.add('dragover');
+    });
+    elDrop.addEventListener('dragleave', ()=>{
+      elDrop.classList.remove('dragover');
+    });
+    elDrop.addEventListener('drop', (e)=>{
+      e.preventDefault();
+      elDrop.classList.remove('dragover');
+      const f = e.dataTransfer.files && e.dataTransfer.files[0];
+      handleFile(f);
+    });
+
+        
+})();
+  </script>
 
 </body>
 </html>
