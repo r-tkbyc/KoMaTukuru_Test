@@ -4,8 +4,8 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
 
-  <!-- Text Formatter v2.1.0 - 2026-03-03 -->
-  <meta name="app-version" content="v2.1.0">
+  <!-- Text Formatter v2.1.1 - 2026-03-04 -->
+  <meta name="app-version" content="v2.1.1">
 
   <title>KoMaTukuru テキスト整形ツール</title>
   <style>
@@ -347,8 +347,8 @@
   <div class="toast" id="toast"></div>
 
   <script>
-  const APP_VERSION = "v2.1.0";
-  const APP_BUILD = "2026-03-03";
+  const APP_VERSION = "v2.1.1";
+  const APP_BUILD = "2026-03-04";
 
   // 価格直前の全角スペース付与を将来再有効化できるように保持
   const PRICE_SPACE_RULE_ENABLED = false;
@@ -1067,7 +1067,321 @@
     }
     applyDebugVisibility();
 
-    // Hidden toggle for diagnostics (only for the person who knows the shortcut)
+    // ========= Excel 1行貼り付け（TSV）取り込み =========
+    // UIは一切変更せず、PDFドロップ領域クリック→Ctrl+V で貼り付けを受け取る。
+    // ※PDFドロップ/選択の既存挙動は維持する（この貼り付け処理は入力欄へ流し込むだけ。自動変換はしない）
+    const pasteSink = document.createElement('textarea');
+    pasteSink.id = 'kmtExcelPasteSink';
+    pasteSink.setAttribute('aria-hidden', 'true');
+    pasteSink.setAttribute('tabindex', '0');
+    pasteSink.autocomplete = 'off';
+    pasteSink.spellcheck = false;
+    pasteSink.style.position = 'fixed';
+    pasteSink.style.left = '-10000px';
+    pasteSink.style.top = '0';
+    pasteSink.style.width = '1px';
+    pasteSink.style.height = '1px';
+    pasteSink.style.opacity = '0';
+    pasteSink.style.pointerEvents = 'none';
+    document.body.appendChild(pasteSink);
+
+    // PDFドロップ領域をクリックしたら貼り付け受け皿へフォーカス（見た目は変えない）
+    elDrop.addEventListener('click', ()=>{
+      try{
+        pasteSink.focus({preventScroll:true});
+        pasteSink.select();
+      }catch(_e){}
+    });
+
+    function toHalfDigits(str){
+      return String(str || '').replace(/[０-９]/g, (ch)=> String.fromCharCode(ch.charCodeAt(0) - 0xFEE0));
+    }
+
+    function circledNumberToPlain(str){
+      const map = {
+        '①':'1','②':'2','③':'3','④':'4','⑤':'5','⑥':'6','⑦':'7','⑧':'8','⑨':'9','⑩':'10',
+        '⑪':'11','⑫':'12','⑬':'13','⑭':'14','⑮':'15','⑯':'16','⑰':'17','⑱':'18','⑲':'19','⑳':'20'
+      };
+      return String(str || '').replace(/[①②③④⑤⑥⑦⑧⑨⑩⑪⑫⑬⑭⑮⑯⑰⑱⑲⑳]/g, (m)=> map[m] || m);
+    }
+
+    function normalizeTitleBrackets(s){
+      // 【】 <> ＜＞ 〔〕 《》 ≪≫ [] → ［］
+      return String(s || '')
+        .replace(/【/g,'［').replace(/】/g,'］')
+        .replace(/</g,'［').replace(/>/g,'］')
+        .replace(/＜/g,'［').replace(/＞/g,'］')
+        .replace(/〔/g,'［').replace(/〕/g,'］')
+        .replace(/《/g,'［').replace(/》/g,'］')
+        .replace(/≪/g,'［').replace(/≫/g,'］')
+        .replace(/\[/g,'［').replace(/\]/g,'］');
+    }
+
+    function stripAnyYear(s){
+      // 4桁年は全て削除（例：2026/、2026年）
+      let t = String(s || '').trim();
+      // 2026年
+      t = t.replace(/[0-9０-９]{4}\s*年\s*/g, '');
+      // 2026/ 2026／ 2026- 2026－ 2026.
+      t = t.replace(/[0-9０-９]{4}\s*[\/／\-－\.]\s*/g, '');
+      return t.trim();
+    }
+
+    function normalizeFinalDayNote(raw){
+      let t = String(raw || '').trim();
+      if(!t) return '';
+      // 先頭の「最終日は」「※」などを除去（残りを解析）
+      t = t.replace(/^※\s*/,'').replace(/^最終日は\s*/,'');
+      t = t.trim();
+
+      if(!t) return '';
+      if(t.includes('閉店まで')) return '※最終日は閉店まで。';
+
+      // Fullwidth digits -> half for parsing
+      const tp = toHalfDigits(t);
+
+      // 24h time (e.g., 17:00 / 16:30)
+      let m = tp.match(/(\d{1,2})\s*[:：]\s*(\d{2})/);
+      if(m){
+        const hh = Math.max(0, Math.min(23, parseInt(m[1],10)));
+        const mm = Math.max(0, Math.min(59, parseInt(m[2],10)));
+        const isPM = hh >= 12;
+        const label = isPM ? '午後' : '午前';
+        const dispH = (hh === 0) ? 12 : (hh > 12 ? hh - 12 : hh);
+        const timeStr = (mm === 0) ? `${label}${dispH}時` : `${label}${dispH}時${mm}分`;
+        return `※最終日は${timeStr}閉場。`;
+      }
+
+      // e.g., 午後5時まで / 午後5時30分 / 午後５時閉場 / 午後5時
+      m = tp.match(/(午前|午後)\s*(\d{1,2})\s*時(?:\s*(\d{1,2})\s*分)?/);
+      if(m){
+        const label = m[1];
+        const hh = parseInt(m[2],10);
+        const mm = m[3] != null ? parseInt(m[3],10) : 0;
+        const timeStr = (mm === 0) ? `${label}${hh}時` : `${label}${hh}時${mm}分`;
+        return `※最終日は${timeStr}閉場。`;
+      }
+
+      // fallback（時間として解釈できない場合はそのまま注記化）
+      // 例: 「午後5時まで」以外の文言でも「※最終日は…。」に揃える
+      return `※最終日は${t.replace(/。+$/,'')}。`;
+    }
+
+    function normalizeFloor(raw){
+      let s = String(raw || '').trim();
+      if(!s) return '';
+      s = toHalfDigits(s);
+
+      if(s.includes('本館')){
+        return s;
+      }
+
+      // 地下1階 / 地下 1階 / 地下1
+      let m = s.match(/地下\s*([0-9]+)\s*階?/);
+      if(m){
+        return `本館地下${m[1]}階`;
+      }
+
+      // 1階 / 5階
+      m = s.match(/^([0-9]+)\s*階$/);
+      if(m){
+        return `本館${m[1]}階`;
+      }
+
+      // "1" のみ
+      m = s.match(/^([0-9]+)$/);
+      if(m){
+        return `本館${m[1]}階`;
+      }
+
+      // それ以外はそのまま（想定外）
+      return s;
+    }
+
+    function normalizeSpaceTokens(line){
+      let s = String(line || '');
+      // SPACE4-① / SPACE４－① / SPACE6-② など
+      s = s.replace(/SPACE\s*([0-9０-９]+)\s*[-－−‐―]\s*([0-9０-９①②③④⑤⑥⑦⑧⑨⑩⑪⑫⑬⑭⑮⑯⑰⑱⑲⑳]+)/g,
+        (_all, g1, g2)=>{
+          const n1 = toHalfDigits(g1);
+          let n2 = circledNumberToPlain(g2);
+          n2 = toHalfDigits(n2);
+          return `SPACE${n1}-${n2}`;
+        }
+      );
+      return s;
+    }
+
+    function normalizeVenueField(raw){
+      let s = normalizeCRLF(String(raw || ''));
+      // セル内改行がある場合は / で1行化（テスト通り）
+      const lines = s.split('\n').map(v=>v.trim()).filter(v=>v.length>0).map(normalizeSpaceTokens);
+      return lines.join(' / ');
+    }
+
+    function parseTSV(text){
+      // CSVと同じ引用符ルールで TSV をパース（セル内改行対応）
+      const s = normalizeCRLF(String(text || ''));
+      const rows = [];
+      let row = [];
+      let field = '';
+      let inQuotes = false;
+
+      for(let i=0; i<s.length; i++){
+        const ch = s[i];
+
+        if(ch === '"'){
+          if(inQuotes){
+            // escaped quote ("")
+            if(s[i+1] === '"'){
+              field += '"';
+              i++;
+            }else{
+              inQuotes = false;
+            }
+          }else{
+            inQuotes = true;
+          }
+          continue;
+        }
+
+        if(ch === '\t' && !inQuotes){
+          row.push(field);
+          field = '';
+          continue;
+        }
+
+        if(ch === '\n' && !inQuotes){
+          row.push(field);
+          field = '';
+          // push row (even if empty; cleaned later)
+          rows.push(row);
+          row = [];
+          continue;
+        }
+
+        field += ch;
+      }
+
+      // tail
+      row.push(field);
+      rows.push(row);
+
+      // remove trailing fully-empty rows
+      while(rows.length){
+        const r = rows[rows.length-1];
+        const allEmpty = r.every(v => String(v || '').trim() === '');
+        if(allEmpty) rows.pop();
+        else break;
+      }
+      return rows;
+    }
+
+    function isLikelyExcelRow(text){
+      const t = String(text || '');
+      if(!t.includes('\t')) return false;
+      // quick heuristic: at least 7 tabs (8 columns)
+      const tabCount = (t.match(/\t/g) || []).length;
+      return tabCount >= 7;
+    }
+
+    async function handleExcelPasteText(rawText){
+      const raw = String(rawText || '');
+      if(!isLikelyExcelRow(raw)){
+        // ignore (do not intervene)
+        setDebug({paste:{ignored:true, reason:'not_tsv_or_too_few_columns', sample: raw.slice(0, 200)}});
+        return;
+      }
+
+      const rows = parseTSV(raw);
+      const first = rows[0] || [];
+      const colCount = first.length;
+
+      // 必要列（1,4,5,6,7,8,9）= index 0,3,4,5,6,7,8 を想定
+      if(colCount < 8){
+        setStatus('貼り付け内容の列数が不足しています（Excelの1行をそのまま貼り付けてください）。');
+        setDebug({paste:{ok:false, reason:'insufficient_columns', colCount, first}});
+        return;
+      }
+
+      const titleRaw = first[0] ?? '';
+      const startRaw = first[3] ?? '';
+      const endRaw = first[4] ?? '';
+      const endTimeRaw = first[5] ?? '';
+      const floorRaw = first[6] ?? '';
+      const venueRaw = first[7] ?? '';
+      const bodyPrimary = (first.length >= 9 ? (first[8] ?? '') : '');
+      const extraCols = (first.length > 9 ? first.slice(9) : []);
+
+      const title = normalizeTitleBrackets(titleRaw).trim();
+
+      const start = stripAnyYear(startRaw);
+      const end = stripAnyYear(endRaw);
+      let kaiki = `${start}-${end}`.trim();
+      const note = normalizeFinalDayNote(endTimeRaw);
+      if(note){
+        kaiki = `${kaiki} ${note}`.trim();
+      }
+
+      const floor = normalizeFloor(floorRaw);
+      const venueJoined = normalizeVenueField(venueRaw);
+      const venue = (venueJoined ? `${floor} ${venueJoined}`.trim() : floor);
+
+      // 本文：基本は9列目（テスト運用に合わせる）。追加列がある場合は診断に出すだけ。
+      const honbun = String(bodyPrimary || '').trim();
+
+      writeInputs({ title, kaiki, venue, honbun });
+
+      setStatus('貼り付け完了：入力欄に反映しました。必要なら「変換」を押してください。');
+      setDebug({
+        paste:{
+          ok:true,
+          rawPreview: raw.slice(0, 800),
+          rows: rows.length,
+          firstColCount: colCount,
+          mappedRaw: { titleRaw, startRaw, endRaw, endTimeRaw, floorRaw, venueRaw, bodyPrimary, extraCols },
+          out: { title, kaiki, venue, honbunPreview: honbun.slice(0, 400) }
+        }
+      });
+    }
+
+    pasteSink.addEventListener('paste', async (e)=>{
+      try{
+        const cd = e.clipboardData;
+        if(!cd) return;
+
+        // If a PDF file is in clipboard, treat it like selecting a PDF.
+        const items = cd.items ? Array.from(cd.items) : [];
+        const pdfItem = items.find(it => it.kind === 'file' && it.type === 'application/pdf');
+        if(pdfItem){
+          e.preventDefault();
+          const f = pdfItem.getAsFile();
+          setDebug({paste:{type:'pdf', name: f ? f.name : '', size: f ? f.size : 0}});
+          await handleFile(f);
+          pasteSink.value = '';
+          return;
+        }
+
+        const rawText = cd.getData('text/plain') || '';
+        // Handle TSV paste (Excel 1行)
+        if(isLikelyExcelRow(rawText)){
+          e.preventDefault();
+          await handleExcelPasteText(rawText);
+        }else{
+          // not TSV: do nothing (avoid intervention)
+          setDebug({paste:{ignored:true, reason:'not_likely_excel_row', sample: String(rawText).slice(0, 200)}});
+        }
+      }catch(err){
+        setStatus('貼り付け処理でエラー：' + (err && err.message ? err.message : String(err)));
+        setDebug({paste:{ok:false, error:String(err), stack: err && err.stack ? String(err.stack) : ''}});
+      }finally{
+        try{ pasteSink.value = ''; }catch(_e){}
+      }
+    });
+
+    // ========= end: Excel paste =========
+
+    // Hidden toggle for diagnostics (only for the person who knows the shortcut) (only for the person who knows the shortcut)
     document.addEventListener('keydown', (e)=>{
       if(e.ctrlKey && e.altKey && e.shiftKey && (e.code === 'KeyD' || e.key === 'D' || e.key === 'd')){
         debugMode = !debugMode;
