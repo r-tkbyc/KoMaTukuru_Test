@@ -4,8 +4,8 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
 
-  <!-- Text Formatter v2.1.2 - 2026-03-04 -->
-  <meta name="app-version" content="v2.1.2">
+  <!-- Text Formatter v2.1.3 - 2026-03-04 -->
+  <meta name="app-version" content="v2.1.3">
 
   <title>KoMaTukuru テキスト整形ツール</title>
   <style>
@@ -155,6 +155,11 @@
     user-select: none;
   }
   #pdfDropZone.dragover{
+    outline: 1px solid #2a81fb;
+    outline-offset: 0;
+    box-shadow: 0 0 0 1px #2a81fb inset;
+  }
+#pdfDropZone.paste-armed{
     outline: 1px solid #2a81fb;
     outline-offset: 0;
     box-shadow: 0 0 0 1px #2a81fb inset;
@@ -1085,9 +1090,17 @@
     pasteSink.style.pointerEvents = 'none';
     document.body.appendChild(pasteSink);
 
+    // click-to-paste の視覚フィードバック（UI追加なし：既存の青枠と同じスタイル）
+    const PASTE_ARMED_CLASS = 'paste-armed';
+    function setPasteArmed(on){
+      try{ elDrop.classList.toggle(PASTE_ARMED_CLASS, !!on); }catch(_e){}
+    }
+    pasteSink.addEventListener('blur', ()=>{ setPasteArmed(false); });
+
     // PDFドロップ領域をクリックしたら貼り付け受け皿へフォーカス（見た目は変えない）
     elDrop.addEventListener('click', ()=>{
       try{
+        setPasteArmed(true);
         pasteSink.focus({preventScroll:true});
         pasteSink.select();
       }catch(_e){}
