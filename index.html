@@ -4,8 +4,8 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
 
-  <!-- Text Formatter v2.1.1 - 2026-03-04 -->
-  <meta name="app-version" content="v2.1.1">
+  <!-- Text Formatter v2.1.2 - 2026-03-04 -->
+  <meta name="app-version" content="v2.1.2">
 
   <title>KoMaTukuru テキスト整形ツール</title>
   <style>
@@ -347,7 +347,7 @@
   <div class="toast" id="toast"></div>
 
   <script>
-  const APP_VERSION = "v2.1.1";
+  const APP_VERSION = "v2.1.2";
   const APP_BUILD = "2026-03-04";
 
   // 価格直前の全角スペース付与を将来再有効化できるように保持
@@ -1135,7 +1135,8 @@
       t = t.trim();
 
       if(!t) return '';
-      if(t.includes('閉店まで')) return '※最終日は閉店まで。';
+      // 「閉店」を含む場合は空欄と同じ扱い（会期への注記は付けない）
+      if(/閉店/.test(t)) return '';
 
       // Fullwidth digits -> half for parsing
       const tp = toHalfDigits(t);
